@@ -179,7 +179,7 @@ enter_shell() {
     log_info "You are now in /workspace/projects"
     log_info "Run 'claude' to start Claude Code"
     echo
-    $compose_cmd exec claude-dev bash
+    $compose_cmd exec -u 1000 claude-dev zsh
 }
 
 # Start Claude Code directly
@@ -194,7 +194,7 @@ start_claude() {
     fi
     
     log_info "Starting Claude Code..."
-    $compose_cmd exec claude-dev claude
+    $compose_cmd exec -u 1000 claude-dev claude --dangerously-skip-permissions
 }
 
 # Show logs
@@ -216,8 +216,8 @@ show_status() {
     if $compose_cmd ps | grep -q "claude-dev.*Up"; then
         log_success "Environment is running"
         log_info "Container details:"
-        docker exec claude-dev-container uname -a 2>/dev/null || true
-        docker exec claude-dev-container claude --version 2>/dev/null || log_warning "Claude Code not responding"
+        docker exec -u 1000 claude-dev-container uname -a 2>/dev/null || true
+        docker exec -u 1000 claude-dev-container claude --version 2>/dev/null || log_warning "Claude Code not responding"
     else
         log_warning "Environment is not running"
         log_info "Use '$0 start' to start the environment"

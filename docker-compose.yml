@@ -1,4 +1,3 @@
-version: '3.8'
 
 services:
   claude-dev:
@@ -8,13 +7,17 @@ services:
       # Mount projects directory (create if not exists)
       - ./projects:/workspace/projects
       # Mount Claude configuration
-      - ./claude-config:/root/.config/claude
+      - ./claude-config:/home/developer/.claude
+      # Mount cache directories for persistence
+      - ./cache:/home/developer/.cache
+      - ./npm-cache:/home/developer/.npm
       # Mount SSH keys if needed
-      - ~/.ssh:/root/.ssh:ro
+      - ~/.ssh:/home/developer/.ssh:ro
     environment:
       # Set Claude API key from environment or .env file
       - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
     stdin_open: true
     tty: true
     working_dir: /workspace/projects
-    command: bash
+    command: ["claude", "--dangerously-skip-permissions"]
+    user: "1000:1000"
