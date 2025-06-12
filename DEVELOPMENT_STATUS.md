@@ -10,7 +10,7 @@ Docker上でClaude Codeを使用するための開発環境テンプレート。
 #### 1. 基本環境構築 ✅
 - **Dockerfile作成**: Node.js 20 + Claude Code環境
 - **docker-compose.yml**: ボリュームマウント設定付き
-- **環境変数テンプレート**: `.env.example`でAPI키 설정
+- **環境変数テンプレート**: `.env.example`でAPI
 - **Git管理**: `.gitignore`で機密情報除外
 
 #### 2. Claude Code設定 ✅
