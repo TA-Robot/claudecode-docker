@@ -11,7 +11,7 @@ RUN apt-get update && apt-get install -y \
     && rm -rf /var/lib/apt/lists/*
 
 # Install Claude Code globally
-RUN npm install -g @anthropic-ai/claude
+RUN npm install -g @anthropic-ai/claude-code
 
 # Set working directory
 WORKDIR /workspace
@@ -20,7 +20,7 @@ WORKDIR /workspace
 RUN mkdir -p /workspace/projects
 
 # Copy default configuration
-COPY claude-config/ /root/.config/claude/
+COPY claude-config/ /root/.claude/
 
 # Keep container running
 CMD ["tail", "-f", "/dev/null"]
