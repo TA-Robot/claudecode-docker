@@ -84,9 +84,40 @@ setup_env() {
     fi
 }
 
+# Automatically rebuild image if Dockerfile changed
+rebuild_if_dockerfile_changed() {
+    local compose_cmd=$(get_compose_cmd)
+    local checksum_file=".dockerfile.sha256"
+
+    # Dockerfile が無い場合は何もしない
+    if [ ! -f Dockerfile ]; then
+        return
+    fi
+
+    # 現在のハッシュを計算
+    local current_checksum=$(sha256sum Dockerfile | awk '{print $1}')
+
+    # 以前のハッシュを取得（無ければ空）
+    local saved_checksum=""
+    if [ -f "$checksum_file" ]; then
+        saved_checksum=$(cat "$checksum_file")
+    fi
+
+    # ハッシュが変わっていれば再ビルド
+    if [ "$current_checksum" != "$saved_checksum" ]; then
+        log_info "Dockerfile の変更を検知しました。イメージを再ビルドします..."
+        $compose_cmd build --no-cache
+        echo "$current_checksum" > "$checksum_file"
+        log_success "イメージを再ビルドしました！"
+    fi
+}
+
 # Start environment
 start_env() {
     local compose_cmd=$(get_compose_cmd)
+    
+    # Dockerfile 変更チェック
+    rebuild_if_dockerfile_changed
     
     log_info "Starting Claude Code development environment..."
     
@@ -199,6 +230,12 @@ build_env() {
     
     log_info "Building container..."
     $compose_cmd build --no-cache
+    
+    # ビルド成功後にハッシュを保存
+    if [ -f Dockerfile ]; then
+        sha256sum Dockerfile | awk '{print $1}' > .dockerfile.sha256
+    fi
+    
     log_success "Container built!"
     log_info "Use '$0 start' to start the new container"
 }
