@@ -1,0 +1,110 @@
+{
+  "tool_permissions": {
+    "bash": "allow",
+    "edit": "allow",
+    "read": "allow",
+    "write": "allow",
+    "glob": "allow",
+    "grep": "allow",
+    "ls": "allow",
+    "multi_edit": "allow",
+    "notebook_read": "allow",
+    "notebook_edit": "allow",
+    "web_fetch": "allow",
+    "web_search": "allow",
+    "task": "allow",
+    "todo_read": "allow",
+    "todo_write": "allow"
+  },
+  "auto_approve": {
+    "enabled": true,
+    "commands": [
+      "npm*",
+      "yarn*",
+      "node*",
+      "python*",
+      "pip*",
+      "git*",
+      "docker*",
+      "ls*",
+      "cat*",
+      "grep*",
+      "find*",
+      "mkdir*",
+      "rm*",
+      "cp*",
+      "mv*",
+      "chmod*",
+      "cd*",
+      "pwd*",
+      "which*",
+      "curl*",
+      "wget*",
+      "echo*",
+      "touch*",
+      "head*",
+      "tail*",
+      "less*",
+      "more*",
+      "wc*",
+      "sort*",
+      "uniq*",
+      "awk*",
+      "sed*",
+      "tar*",
+      "zip*",
+      "unzip*",
+      "ps*",
+      "top*",
+      "htop*",
+      "kill*",
+      "killall*",
+      "jobs*",
+      "bg*",
+      "fg*",
+      "nohup*"
+    ],
+    "file_operations": {
+      "read": true,
+      "write": true,
+      "edit": true,
+      "create": true,
+      "delete": false
+    }
+  },
+  "security": {
+    "require_confirmation_for": [
+      "sudo*",
+      "su*",
+      "passwd*",
+      "adduser*",
+      "deluser*",
+      "usermod*",
+      "systemctl*",
+      "service*",
+      "mount*",
+      "umount*",
+      "fdisk*",
+      "mkfs*",
+      "dd*",
+      "crontab*",
+      "at*",
+      "batch*"
+    ],
+    "blocked_commands": [
+      "format*",
+      "fdisk /dev/sd*",
+      "dd if=* of=/dev/sd*",
+      "rm -rf /*",
+      ":(){ :|:& };:"
+    ]
+  },
+  "development": {
+    "workspace_root": "/workspace/projects",
+    "default_shell": "/bin/bash",
+    "environment_variables": {
+      "NODE_ENV": "development",
+      "PYTHONPATH": "/workspace/projects"
+    }
+  }
+}

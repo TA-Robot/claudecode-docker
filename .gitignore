@@ -1,0 +1,19 @@
+# Environment variables
+.env
+
+# Docker volumes
+projects/*/node_modules
+projects/*/.next
+projects/*/dist
+projects/*/build
+
+# Claude configuration with secrets
+claude-config/config.json
+
+# OS generated files
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+logs/

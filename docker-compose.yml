@@ -1,0 +1,20 @@
+version: '3.8'
+
+services:
+  claude-dev:
+    build: .
+    container_name: claude-dev-container
+    volumes:
+      # Mount projects directory (create if not exists)
+      - ./projects:/workspace/projects
+      # Mount Claude configuration
+      - ./claude-config:/root/.config/claude
+      # Mount SSH keys if needed
+      - ~/.ssh:/root/.ssh:ro
+    environment:
+      # Set Claude API key from environment or .env file
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
+    stdin_open: true
+    tty: true
+    working_dir: /workspace/projects
+    command: bash
