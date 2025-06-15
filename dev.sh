@@ -46,6 +46,19 @@ get_compose_cmd() {
     fi
 }
 
+# Copy credentials from host to container mount
+copy_credentials() {
+    if [[ -f "$HOME/.claude/.credentials.json" ]]; then
+        log_info "Copying Claude credentials..."
+        mkdir -p ./claude-config
+        cp "$HOME/.claude/.credentials.json" ./claude-config/.credentials.json
+        chmod 600 ./claude-config/.credentials.json
+        log_success "Credentials copied successfully"
+    else
+        log_info "No credentials found at $HOME/.claude/.credentials.json"
+    fi
+}
+
 # Show help
 show_help() {
     log_header "=== Claude Code Docker Environment Management ==="
@@ -82,6 +95,9 @@ setup_env() {
     else
         ./setup.sh
     fi
+    
+    # Copy credentials if exists
+    copy_credentials
 }
 
 # Automatically rebuild image if Dockerfile changed
@@ -106,7 +122,8 @@ rebuild_if_dockerfile_changed() {
     # ハッシュが変わっていれば再ビルド
     if [ "$current_checksum" != "$saved_checksum" ]; then
         log_info "Dockerfile の変更を検知しました。イメージを再ビルドします..."
-        $compose_cmd build --no-cache
+        #$compose_cmd build --no-cache
+        $compose_cmd build 
         echo "$current_checksum" > "$checksum_file"
         log_success "イメージを再ビルドしました！"
     fi
@@ -141,6 +158,9 @@ start_env() {
         log_warning "ANTHROPIC_API_KEY not configured in .env"
         log_info "Please edit .env and add your API key, then restart"
     fi
+    
+    # Copy credentials before starting
+    copy_credentials
     
     $compose_cmd up -d
     log_success "Environment started!"
@@ -229,7 +249,8 @@ build_env() {
     local compose_cmd=$(get_compose_cmd)
     
     log_info "Building container..."
-    $compose_cmd build --no-cache
+    #$compose_cmd build --no-cache
+    $compose_cmd build 
     
     # ビルド成功後にハッシュを保存
     if [ -f Dockerfile ]; then

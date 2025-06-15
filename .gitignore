@@ -3,6 +3,8 @@
 
 # Docker volumes
 projects/*
+cache/*
+npm-cache/*
 
 # Claude configuration with secrets
 claude-config/config.json

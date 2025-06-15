@@ -169,6 +169,64 @@ docker-compose down
 
 ## 更新履歴
 
+### v1.3.5 (2025-06-15) - Jest実行権限エラーの解決
+- **実装内容**: `npm test`実行時の`Permission denied`エラーを解決する包括的な権限修正スクリプトを作成
+- **理由**: ENTRYPOINTでnpm installは成功するが、node_modules/.bin内の実行ファイルに実行権限が付与されない問題を解決
+- **テスト**: Docker再ビルド後に`npm test`が正常に実行可能になることを確認予定
+- **影響範囲**: Dockerfile、scripts/fix-jest-permissions.sh、実行ファイルの権限管理
+- **詳細対策**:
+  - 専用権限修正スクリプト`fix-jest-permissions.sh`を作成
+  - jest, mocha, ts-node, eslint等の主要npmツールの権限を一括修正
+  - ENTRYPOINTでnpm install後に自動実行
+  - .zshrcの`fixperms`コマンドから手動実行も可能
+  - グローバル/ローカル両方のnode_modulesに対応
+- **次のステップ**: Docker再ビルドと実環境での動作確認
+
+### v1.3.4 (2025-06-15) - Cursor AI共同開発環境の整備
+- **実装内容**: Cursor用の設定ファイル(.cursorrules)を作成し、Claude CodeとCursorでの一貫した開発体験を実現
+- **理由**: Claude CodeとCursorの両方でプロジェクトを編集する際の開発ルールと設定を統一
+- **テスト**: .cursorrules作成、内容はCLAUDE.mdと整合性を確保
+- **影響範囲**: Cursor AI利用時の開発体験、プロジェクトルールの統一
+- **詳細対策**:
+  - 必須開発ルール（開発履歴管理、TDD）をCursor用に明記
+  - Docker環境固有の注意事項を記載
+  - コマンド一覧とファイル構造を整理
+  - AIアシスタント動作の指針を統一
+- **次のステップ**: Cursorでの実使用確認とフィードバック反映
+
+### v1.3.3 (2025-06-15) - docker-compose.yml修正によるENTRYPOINT問題解決
+- **実装内容**: docker-compose.ymlのcommand設定を削除してDockerfileのENTRYPOINTが正しく実行されるように修正
+- **理由**: docker-compose.ymlのcommandがDockerfileのENTRYPOINTを上書きしていたため、npm自動インストールが実行されなかった
+- **テスト**: `./dev.sh start` → `./dev.sh claude`でClaude Code起動後、テスト実行可能
+- **影響範囲**: docker-compose.yml、コンテナ起動時の自動初期化処理
+- **次のステップ**: 実環境での動作確認
+
+### v1.3.2 (2025-06-15) - npm権限問題の継続的対応
+- **実装内容**: npmキャッシュディレクトリを/tmpに移動して権限問題を回避
+- **理由**: 従来の対策では解決しなかったnpm EACCES権限エラーの根本的解決
+- **テスト**: Docker再ビルド後に検証予定
+- **影響範囲**: Dockerfile、docker-compose.yml、npmの動作
+- **詳細対策**:
+  - NPM_CONFIG_CACHE=/tmp/npm-cacheに変更
+  - sudoを完全に削除（セキュリティ向上）
+  - ENTRYPOINTスクリプトで起動時に権限を自動設定
+  - DOCKERPERMISSIONPROBLEMS.mdで問題を継続的に追跡
+- **課題**: 根本的な解決には至っていない、継続的な監視が必要
+
+### v1.3.1 (2025-06-14) - 包括的な権限エラー対策実装
+- **実装内容**: Dockerコンテナ内で発生する権限エラーを包括的に解決
+- **理由**: npm test実行時のJest権限エラーなど開発時の権限問題を防止
+- **テスト**: 手動で権限設定をテスト（Docker再ビルド後に検証予定）
+- **影響範囲**: Dockerfile、開発者の作業効率向上
+- **詳細対策**:
+  - sudoのパスワードなし実行設定
+  - 各種開発ディレクトリの事前作成と権限設定
+  - グローバルnpmツール（jest, mocha, eslint等）のプリインストール
+  - .zshrcにchpwd()関数追加（ディレクトリ移動時の自動権限修正）
+  - fixperms()ヘルパー関数（手動権限修正コマンド）
+  - Docker-in-Docker用ソケット権限自動修正
+  - 起動時の共通ディレクトリ権限チェック
+
 ### v1.3.0 (2025-01-06) - Claude Code公式ベストプラクティス適用
 - **Claude Code公式Dockerfileエッセンス適用**: セキュリティ・権限管理・開発体験の全面改善
 - **権限問題解決**: 非rootユーザー（UID 1000）での安全な実行環境構築

@@ -3,21 +3,27 @@ services:
   claude-dev:
     build: .
     container_name: claude-dev-container
+    # Run as non-root user from the start
+    user: "1000:1000"
     volumes:
       # Mount projects directory (create if not exists)
       - ./projects:/workspace/projects
       # Mount Claude configuration
       - ./claude-config:/home/developer/.claude
+      # Mount credentials if exists
+      - ./claude-config/.credentials.json:/home/developer/.claude/.credentials.json:ro
       # Mount cache directories for persistence
       - ./cache:/home/developer/.cache
-      - ./npm-cache:/home/developer/.npm
       # Mount SSH keys if needed
       - ~/.ssh:/home/developer/.ssh:ro
+      # Mount Docker socket for Docker-in-Docker
+      - /var/run/docker.sock:/var/run/docker.sock
     environment:
       # Set Claude API key from environment or .env file
       - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
+      # npm config
+      - NPM_CONFIG_CACHE=/tmp/npm-cache
+      - NPM_CONFIG_PREFIX=/home/developer/.npm-global
     stdin_open: true
     tty: true
     working_dir: /workspace/projects
-    command: ["claude", "--dangerously-skip-permissions"]
-    user: "1000:1000"

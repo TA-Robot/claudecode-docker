@@ -1,0 +1,7 @@
+# NPM configuration for Docker environment
+cache=/tmp/npm-cache
+prefix=/home/developer/.npm-global
+fund=false
+audit=false
+progress=false
+update-notifier=false
