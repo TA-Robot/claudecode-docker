@@ -67,9 +67,13 @@ generate_dynamic_compose() {
     log_info "Generating docker-compose configuration for project: $project_name"
     
     cat > "$compose_file" << EOF
+version: '3.8'
+
 services:
   claude-dev:
-    build: .
+    build: 
+      context: .
+      dockerfile: Dockerfile
     image: claude-code:${project_name}
     container_name: claude-dev-${project_name}
     user: "1000:1000"
@@ -108,6 +112,9 @@ EOF
     
     # Create project-specific cache directory if it doesn't exist
     mkdir -p "./cache/${project_name}"
+    
+    # Return the generated file name
+    echo "$compose_file"
 }
 
 # Check if Docker Compose is available
