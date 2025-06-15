@@ -6,6 +6,24 @@ This is a default configuration file for Claude Code in Docker environment.
 
 **開発作業をしたら、その場で即座にDEVELOPMENT_STATUS.mdに記録すること！**
 
+## マルチプロジェクト対応 (v1.4.0+)
+
+このDocker環境は複数のプロジェクトを独立して管理できます。
+
+### プロジェクト識別設定
+```bash
+# このファイルと同じディレクトリに.project-nameファイルを作成
+echo "your-project-name" > .project-name
+```
+
+これにより、このプロジェクト専用の：
+- Dockerイメージ（`claude-code:your-project-name`）
+- コンテナ（`claude-dev-your-project-name`）
+- ネットワーク（`claude-your-project-name-network`）
+- キャッシュディレクトリ（`cache/your-project-name/`）
+
+が作成され、他のプロジェクトと完全に独立した環境で作業できます。
+
 ## Project Information
 - **Project Type**: AI-Powered Project Management Platform
 - **Technology Stack**: Node.js, TypeScript, PostgreSQL, Redis

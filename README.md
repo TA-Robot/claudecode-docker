@@ -115,18 +115,56 @@ claude
 ### ファイル編集
 `./projects/` ディレクトリはホストマシンとマウントされているため、お好みのエディタで編集できます。
 
+## マルチプロジェクト対応 (v1.4.0+)
+
+同一ホストで複数の独立したプロジェクトを管理できます。
+
+### プロジェクトの識別設定
+```bash
+# プロジェクト名を設定
+echo "my-project-name" > projects/.project-name
+
+# プロジェクトごとに独立した環境が起動
+./dev.sh start
+```
+
+### 複数プロジェクトの運用例
+```bash
+# プロジェクト1（ディレクトリ: ~/work/project1/claudecode-docker）
+cd ~/work/project1/claudecode-docker
+echo "frontend-app" > projects/.project-name
+./dev.sh start  # frontend-app用の独立環境
+
+# プロジェクト2（ディレクトリ: ~/work/project2/claudecode-docker）
+cd ~/work/project2/claudecode-docker
+echo "backend-api" > projects/.project-name
+./dev.sh start  # backend-api用の独立環境
+
+# 各プロジェクトは独立したDocker環境で動作
+```
+
+### 仕組み
+- プロジェクトごとに独立したDockerイメージ（`claude-code:project-name`）
+- プロジェクトごとに独立したコンテナ（`claude-dev-project-name`）
+- プロジェクトごとに独立したネットワーク（`claude-project-name-network`）
+- プロジェクトごとに独立したキャッシュ（`./cache/project-name/`）
+
 ## ディレクトリ構造
 
 ```
 claude-docker/
 ├── Dockerfile              # Claude Code環境の定義
-├── docker-compose.yml      # コンテナ設定
+├── docker-compose.yml      # コンテナ設定（テンプレート）
+├── docker-compose.generated.yml  # 動的生成される実際の設定（.gitignore）
 ├── .env.example            # 環境変数テンプレート
 ├── .gitignore              # Git無視ファイル
 ├── projects/               # 開発プロジェクト（ホストとマウント）
+│   ├── .project-name       # プロジェクト識別ファイル（オプション）
 │   └── CLAUDE.md           # Claude Code設定テンプレート（TDD・履歴管理ルール含む）
 ├── claude-config/          # Claude Code設定ディレクトリ
 │   └── settings.json       # 自動承認設定
+├── cache/                  # プロジェクトごとのキャッシュ
+│   └── project-name/       # 各プロジェクト専用キャッシュ
 ├── dev.sh                  # メイン管理スクリプト
 ├── setup.sh                # セットアップ（wrapper）
 ├── scripts/                # 管理スクリプト集

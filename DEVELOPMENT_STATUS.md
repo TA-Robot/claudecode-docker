@@ -169,6 +169,31 @@ docker-compose down
 
 ## 更新履歴
 
+### v1.4.0 (2025-06-15) - マルチプロジェクト対応
+- **実装内容**: 同一ホストで複数の独立したプロジェクトを管理できる仕組みを実装
+- **理由**: 従来は全プロジェクトでDockerイメージが共有され、最後にビルドしたプロジェクトの設定で上書きされる問題を解決
+- **テスト**: `projects/.project-name`ファイルでプロジェクト識別、動的docker-compose.yml生成を確認
+- **影響範囲**: dev.sh、docker-compose設定生成、コンテナ・イメージ・ネットワークの分離
+- **詳細実装**:
+  - `projects/.project-name`ファイルからプロジェクト名を読み取り
+  - `docker-compose.generated.yml`を動的生成（プロジェクトごとに異なる設定）
+  - イメージ名: `claude-code:${project_name}`
+  - コンテナ名: `claude-dev-${project_name}`
+  - ネットワーク名: `claude-${project_name}-network`
+  - キャッシュディレクトリ: `./cache/${project_name}/`
+  - Dockerfileハッシュもプロジェクトごとに管理
+- **使用方法**:
+  ```bash
+  # プロジェクト1
+  echo "my-project-1" > projects/.project-name
+  ./dev.sh start  # my-project-1用の独立環境が起動
+  
+  # プロジェクト2（別ディレクトリ）
+  echo "my-project-2" > projects/.project-name
+  ./dev.sh start  # my-project-2用の独立環境が起動
+  ```
+- **次のステップ**: 実環境での動作確認とドキュメント更新
+
 ### v1.3.5 (2025-06-15) - Jest実行権限エラーの解決
 - **実装内容**: `npm test`実行時の`Permission denied`エラーを解決する包括的な権限修正スクリプトを作成
 - **理由**: ENTRYPOINTでnpm installは成功するが、node_modules/.bin内の実行ファイルに実行権限が付与されない問題を解決
