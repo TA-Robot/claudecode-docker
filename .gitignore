@@ -23,3 +23,8 @@ logs/
 
 .temp/*
 .dockerfile.sha256
+.dockerfile.*.sha256
+
+# Docker Compose override file (dynamically generated)
+docker-compose.override.yml
+docker-compose.generated.yml

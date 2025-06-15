@@ -10,8 +10,6 @@ services:
       - ./projects:/workspace/projects
       # Mount Claude configuration
       - ./claude-config:/home/developer/.claude
-      # Mount credentials if exists
-      - ./claude-config/.credentials.json:/home/developer/.claude/.credentials.json:ro
       # Mount cache directories for persistence
       - ./cache:/home/developer/.cache
       # Mount SSH keys if needed
