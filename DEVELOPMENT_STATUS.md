@@ -252,6 +252,19 @@ docker-compose down
   - Docker-in-Docker用ソケット権限自動修正
   - 起動時の共通ディレクトリ権限チェック
 
+### v1.4.0 (2025-01-17) - Docker環境アーキテクチャ大幅改善
+- **実装内容**: 共通Dockerイメージ + プロジェクトごとのvolume mount方式に変更
+- **理由**: 複数プロジェクトでのDocker環境効率化、ディスク容量削減
+- **テスト**: 複数ディレクトリでの同時起動確認、プロジェクト分離動作確認
+- **影響範囲**: dev.sh、docker-compose.yml、全体的なアーキテクチャ変更
+- **詳細変更**:
+  - docker-compose.generated.yml生成を廃止、docker-compose.yml直接使用
+  - イメージ名を`claude-code:latest`に統一（プロジェクト別ビルド廃止）
+  - コンテナ名をディレクトリパスのハッシュベースに自動生成
+  - `CLAUDE_DOCKER_IMAGE`環境変数で外部共通イメージ指定可能
+  - docker-compose.template.yml → docker-compose.ymlにリネーム
+  - 関連スクリプトを全て更新（setup-minimal.sh、test*.sh等）
+
 ### v1.3.0 (2025-01-06) - Claude Code公式ベストプラクティス適用
 - **Claude Code公式Dockerfileエッセンス適用**: セキュリティ・権限管理・開発体験の全面改善
 - **権限問題解決**: 非rootユーザー（UID 1000）での安全な実行環境構築

@@ -2,6 +2,13 @@
 
 Docker上でClaude Codeを使用するための開発環境テンプレートです。
 
+## 特徴
+
+- **共通Dockerイメージ**: 複数プロジェクトで同じイメージを共有
+- **プロジェクト分離**: 各ディレクトリのprojects/は独立してマウント
+- **自動コンテナ識別**: ディレクトリパスのハッシュでコンテナを自動識別
+- **同時起動対応**: 複数のclaudecode-dockerディレクトリを同時に使用可能
+
 ## クイックスタート
 
 ### 1. セットアップ
@@ -63,16 +70,37 @@ cp .env.example .env
 
 #### 3. コンテナのビルドと起動
 ```bash
+# 初回ビルド（共通イメージを作成）
+./dev.sh build
+
+# 環境起動
 ./dev.sh start
-# または
-docker-compose up -d --build
 ```
 
 #### 4. コンテナに入る
 ```bash
 ./dev.sh shell
-# または
-docker-compose exec claude-dev bash
+# コンテナ内で作業開始
+```
+
+## 複数プロジェクトでの使用
+
+### 共通イメージを使った複数環境
+```bash
+# プロジェクト1
+cd /path/to/claudecode-docker-1
+./dev.sh start  # コンテナ名: claude-XXXXXXXX-claude-dev-1
+
+# プロジェクト2（同時起動可能）
+cd /path/to/claudecode-docker-2
+./dev.sh start  # コンテナ名: claude-YYYYYYYY-claude-dev-1
+```
+
+### 外部共通イメージの使用
+```bash
+# 共通イメージを指定
+export CLAUDE_DOCKER_IMAGE="my-shared-claude:latest"
+./dev.sh start
 ```
 
 ## 使用方法
@@ -119,43 +147,33 @@ claude
 
 同一ホストで複数の独立したプロジェクトを管理できます。
 
-### プロジェクトの識別設定
-```bash
-# プロジェクト名を設定
-echo "my-project-name" > projects/.project-name
+### アーキテクチャ
 
-# プロジェクトごとに独立した環境が起動
-./dev.sh start
+```
+共通Dockerイメージ: claude-code:latest
+          ↓
+claudecode-docker-1/
+├── projects/     → コンテナ: claude-XXXXXXXX-claude-dev-1
+├── cache/        → マウント先: /workspace/projects
+└── dev.sh
+
+claudecode-docker-2/
+├── projects/     → コンテナ: claude-YYYYYYYY-claude-dev-1
+├── cache/        → マウント先: /workspace/projects
+└── dev.sh
 ```
 
-### 複数プロジェクトの運用例
-```bash
-# プロジェクト1（ディレクトリ: ~/work/project1/claudecode-docker）
-cd ~/work/project1/claudecode-docker
-echo "frontend-app" > projects/.project-name
-./dev.sh start  # frontend-app用の独立環境
-
-# プロジェクト2（ディレクトリ: ~/work/project2/claudecode-docker）
-cd ~/work/project2/claudecode-docker
-echo "backend-api" > projects/.project-name
-./dev.sh start  # backend-api用の独立環境
-
-# 各プロジェクトは独立したDocker環境で動作
-```
-
-### 仕組み
-- プロジェクトごとに独立したDockerイメージ（`claude-code:project-name`）
-- プロジェクトごとに独立したコンテナ（`claude-dev-project-name`）
-- プロジェクトごとに独立したネットワーク（`claude-project-name-network`）
-- プロジェクトごとに独立したキャッシュ（`./cache/project-name/`）
+- **共通イメージ**: すべてのプロジェクトで`claude-code:latest`を使用
+- **コンテナ識別**: ディレクトリパスのハッシュで自動的にユニークなコンテナ名を生成
+- **プロジェクト分離**: 各ディレクトリの`projects/`フォルダは独立してマウント
+- **同時起動対応**: 複数のclaudecode-dockerディレクトリを同時に使用可能
 
 ## ディレクトリ構造
 
 ```
-claude-docker/
+claudecode-docker/
 ├── Dockerfile              # Claude Code環境の定義
-├── docker-compose.yml      # コンテナ設定（テンプレート）
-├── docker-compose.generated.yml  # 動的生成される実際の設定（.gitignore）
+├── docker-compose.yml      # コンテナ設定
 ├── .env.example            # 環境変数テンプレート
 ├── .gitignore              # Git無視ファイル
 ├── projects/               # 開発プロジェクト（ホストとマウント）
@@ -163,8 +181,7 @@ claude-docker/
 │   └── CLAUDE.md           # Claude Code設定テンプレート（TDD・履歴管理ルール含む）
 ├── claude-config/          # Claude Code設定ディレクトリ
 │   └── settings.json       # 自動承認設定
-├── cache/                  # プロジェクトごとのキャッシュ
-│   └── project-name/       # 各プロジェクト専用キャッシュ
+├── cache/                  # キャッシュディレクトリ
 ├── dev.sh                  # メイン管理スクリプト
 ├── setup.sh                # セットアップ（wrapper）
 ├── scripts/                # 管理スクリプト集
