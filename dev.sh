@@ -68,6 +68,10 @@ generate_dynamic_compose() {
 
 # Check if Docker Compose is available
 get_compose_cmd() {
+    # Set project name based on current directory path
+    local dir_hash=$(pwd | sha256sum | cut -c1-8)
+    export COMPOSE_PROJECT_NAME="claude-${dir_hash}"
+    
     if command -v docker-compose >/dev/null 2>&1; then
         echo "docker-compose"
     elif docker compose version >/dev/null 2>&1; then
