@@ -243,8 +243,35 @@ RUN mkdir -p /home/developer/.cache/npm/_cacache/tmp && \
 # Switch to user with UID 1000
 USER 1000
 
-# Install and configure Oh My Zsh
-RUN sh -c "$(curl -fsSL https://raw.github.com/ohmyzsh/ohmyzsh/master/tools/install.sh)" "" --unattended
+# Set environment variables for the user
+ENV HOME=/home/developer
+ENV USER=developer
+ENV PATH=/home/developer/.local/bin:/home/developer/bin:/home/developer/.cargo/bin:$PATH:/home/developer/.npm-global/bin
+
+# Change to home directory
+WORKDIR /home/developer
+
+# Install and configure Oh My Zsh with timeout and retry
+RUN for i in 1 2 3; do \
+        echo "Attempt $i to install Oh My Zsh..." && \
+        echo "Current directory: $(pwd)" && \
+        echo "User: $(whoami)" && \
+        echo "HOME: $HOME" && \
+        curl -fsSL --connect-timeout 30 --max-time 120 https://cdn.jsdelivr.net/gh/ohmyzsh/ohmyzsh@master/tools/install.sh -o /tmp/install_omz.sh && \
+        sh /tmp/install_omz.sh --unattended && \
+        rm -f /tmp/install_omz.sh && \
+        break || \
+        (echo "Attempt $i failed, retrying..." && sleep 5); \
+    done && \
+    # Create .zshrc if it doesn't exist (in case oh-my-zsh installation failed)
+    touch /home/developer/.zshrc && \
+    # Add null_glob option at the beginning of .zshrc to prevent wildcard errors
+    echo '# Prevent "no matches found" errors' > /tmp/zshrc_header && \
+    echo 'setopt null_glob' >> /tmp/zshrc_header && \
+    echo 'setopt no_nomatch' >> /tmp/zshrc_header && \
+    echo '' >> /tmp/zshrc_header && \
+    cat /home/developer/.zshrc >> /tmp/zshrc_header && \
+    mv /tmp/zshrc_header /home/developer/.zshrc
 
 # Install Rust for the user (since we switched to user 1000)
 RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y && \
@@ -282,8 +309,11 @@ RUN echo '# Custom environment paths' >> /home/developer/.zshrc && \
     echo '    fix_npm_permissions' >> /home/developer/.zshrc && \
     echo '  fi' >> /home/developer/.zshrc && \
     echo '}' >> /home/developer/.zshrc && \
-    echo 'chmod -R +x ./node_modules/.bin/* 2>/dev/null || true' >> /home/developer/.zshrc && \
-    echo 'chmod -R +x $HOME/.npm-global/lib/node_modules/.bin/* 2>/dev/null || true' >> /home/developer/.zshrc && \
+    echo '# Use glob with null_glob option to avoid errors when no files match' >> /home/developer/.zshrc && \
+    echo 'setopt null_glob' >> /home/developer/.zshrc && \
+    echo 'for f in ./node_modules/.bin/*(N); do chmod +x "$f" 2>/dev/null || true; done' >> /home/developer/.zshrc && \
+    echo 'for f in $HOME/.npm-global/lib/node_modules/.bin/*(N); do chmod +x "$f" 2>/dev/null || true; done' >> /home/developer/.zshrc && \
+    echo 'unsetopt null_glob' >> /home/developer/.zshrc && \
     echo '' >> /home/developer/.zshrc && \
     echo '# Auto-fix permissions when entering a directory' >> /home/developer/.zshrc && \
     echo 'chpwd() {' >> /home/developer/.zshrc && \

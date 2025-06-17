@@ -169,6 +169,28 @@ docker-compose down
 
 ## 更新履歴
 
+### v1.4.1 (2025-06-17) - USER切り替え後の環境変数問題修正
+- **実装内容**: Dockerfile内でUSER 1000切り替え後にHOME/USER環境変数が未設定だった問題を修正
+- **理由**: 環境変数未設定によりcurlのSSL接続が320秒タイムアウトし、oh-my-zshインストールが失敗
+- **テスト**: Docker再ビルド後にoh-my-zshインストールが正常に完了することを確認予定
+- **影響範囲**: Dockerfile（244-249行目）、コンテナビルド時間の大幅短縮
+- **詳細原因**:
+  - USER 1000切り替え後、HOME環境変数が未設定
+  - curlがSSL証明書検証やキャッシュディレクトリにアクセスできない
+  - SSLハンドシェイクが異常に遅くなり320秒でタイムアウト
+  - .zshrcファイルも作成されない
+- **修正内容**:
+  ```dockerfile
+  # Switch to user with UID 1000
+  USER 1000
+  
+  # Set environment variables for the user
+  ENV HOME=/home/developer
+  ENV USER=developer
+  ENV PATH=/home/developer/.local/bin:/home/developer/bin:/home/developer/.cargo/bin:$PATH:/home/developer/.npm-global/bin
+  ```
+- **次のステップ**: Docker再ビルドと実環境での動作確認
+
 ### v1.4.0 (2025-06-15) - マルチプロジェクト対応
 - **実装内容**: 同一ホストで複数の独立したプロジェクトを管理できる仕組みを実装
 - **理由**: 従来は全プロジェクトでDockerイメージが共有され、最後にビルドしたプロジェクトの設定で上書きされる問題を解決
