@@ -70,12 +70,13 @@ generate_dynamic_compose() {
 get_compose_cmd() {
     # Set project name based on current directory path
     local dir_hash=$(pwd | sha256sum | cut -c1-8)
-    export COMPOSE_PROJECT_NAME="claude-${dir_hash}"
+    local project_name="claude-${dir_hash}"
+    export COMPOSE_PROJECT_NAME="$project_name"
     
     if command -v docker-compose >/dev/null 2>&1; then
-        echo "docker-compose"
+        echo "docker-compose -p $project_name"
     elif docker compose version >/dev/null 2>&1; then
-        echo "docker compose"
+        echo "docker compose -p $project_name"
     else
         log_error "Docker Compose not found. Please run ./setup.sh first"
         exit 1
