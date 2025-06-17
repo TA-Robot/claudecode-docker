@@ -45,7 +45,7 @@ echo
 
 # Check Dockerfile syntax
 echo "3. Dockerfile validation..."
-if grep -q "FROM node:" Dockerfile && grep -q "RUN npm install -g @anthropic-ai/claude" Dockerfile; then
+if grep -q "FROM node:" Dockerfile && grep -q "RUN npm install -g @anthropic-ai/claude-code" Dockerfile; then
     echo "✓ Dockerfile contains expected Claude Code installation"
 else
     echo "✗ Dockerfile missing Claude Code installation"
@@ -88,7 +88,7 @@ if $all_good; then
     echo
     echo "Next steps:"
     echo "1. Run './test.sh' for full Docker test (requires Docker)"
-    echo "2. Or manually: docker-compose build && docker-compose up -d"
+    echo "2. Or manually: ./dev.sh build && ./dev.sh start"
 else
     echo "✗ Some validations failed!"
     echo "Please fix the issues above before proceeding."

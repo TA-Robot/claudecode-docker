@@ -59,74 +59,15 @@ get_project_name() {
     echo "$project_name"
 }
 
-# Generate dynamic docker-compose configuration
+# This function is no longer needed as we use docker-compose.yml directly
+# Kept for backward compatibility but does nothing
 generate_dynamic_compose() {
-    local project_name=$(get_project_name)
-    local compose_file="docker-compose.generated.yml"
-    
-    log_info "Generating docker-compose configuration for project: $project_name"
-    
-    cat > "$compose_file" << EOF
-version: '3.8'
-
-services:
-  claude-dev:
-    build: 
-      context: .
-      dockerfile: Dockerfile
-    image: claude-code:${project_name}
-    container_name: claude-dev-${project_name}
-    user: "1000:1000"
-    volumes:
-      # Mount projects directory
-      - ./projects:/workspace/projects
-      # Mount Claude configuration
-      - ./claude-config:/home/developer/.claude
-      # Project-specific cache directory
-      - ./cache/${project_name}:/home/developer/.cache
-      # Mount SSH keys if needed
-      - ~/.ssh:/home/developer/.ssh:ro
-      # Mount Docker socket for Docker-in-Docker
-      - /var/run/docker.sock:/var/run/docker.sock
-    environment:
-      # Set Claude API key from environment or .env file
-      - ANTHROPIC_API_KEY=\${ANTHROPIC_API_KEY:-}
-      # Project name environment variable
-      - PROJECT_NAME=${project_name}
-      # npm config
-      - NPM_CONFIG_CACHE=/tmp/npm-cache
-      - NPM_CONFIG_PREFIX=/home/developer/.npm-global
-    networks:
-      - claude-${project_name}-net
-    stdin_open: true
-    tty: true
-    working_dir: /workspace/projects
-
-networks:
-  claude-${project_name}-net:
-    name: claude-${project_name}-network
-    driver: bridge
-EOF
-    
-    log_success "Generated $compose_file for project: $project_name"
-    
-    # Create project-specific cache directory if it doesn't exist
-    mkdir -p "./cache/${project_name}"
-    
-    # Return the generated file name
-    echo "$compose_file"
+    log_info "Using docker-compose.yml directly (no generation needed)"
+    echo "docker-compose.yml"
 }
 
 # Check if Docker Compose is available
 get_compose_cmd() {
-    # Generate dynamic compose file if it doesn't exist
-    if [ ! -f "docker-compose.generated.yml" ]; then
-        generate_dynamic_compose
-    fi
-    
-    # Set compose file to use
-    export COMPOSE_FILE="docker-compose.generated.yml"
-    
     if command -v docker-compose >/dev/null 2>&1; then
         echo "docker-compose"
     elif docker compose version >/dev/null 2>&1; then
@@ -152,24 +93,12 @@ copy_credentials() {
 
 # Create docker-compose override file based on credentials availability
 create_compose_override() {
+    # Note: Override functionality is now handled by explicit -f flags in get_compose_cmd
+    # This function is kept for backward compatibility but doesn't create override files
     if [[ -f "./claude-config/.credentials.json" ]]; then
-        log_info "Creating docker-compose.override.yml with credentials mount..."
-        cat > docker-compose.override.yml << 'EOF'
-version: '3.8'
-
-services:
-  claude-dev:
-    volumes:
-      # Mount credentials file only when it exists
-      - ./claude-config/.credentials.json:/home/developer/.claude/.credentials.json:ro
-EOF
-        log_success "Override file created with credentials mount"
+        log_info "Credentials found, will be mounted via generated compose file"
     else
-        # Remove override file if credentials don't exist
-        if [[ -f "docker-compose.override.yml" ]]; then
-            log_info "Removing docker-compose.override.yml (no credentials found)"
-            rm -f docker-compose.override.yml
-        fi
+        log_info "No credentials found at ./claude-config/.credentials.json"
     fi
 }
 
@@ -217,8 +146,7 @@ setup_env() {
 # Automatically rebuild image if Dockerfile changed
 rebuild_if_dockerfile_changed() {
     local compose_cmd=$(get_compose_cmd)
-    local project_name=$(get_project_name)
-    local checksum_file=".dockerfile.${project_name}.sha256"
+    local checksum_file=".dockerfile.sha256"
 
     # Dockerfile が無い場合は何もしない
     if [ ! -f Dockerfile ]; then
@@ -236,11 +164,11 @@ rebuild_if_dockerfile_changed() {
 
     # ハッシュが変わっていれば再ビルド
     if [ "$current_checksum" != "$saved_checksum" ]; then
-        log_info "Dockerfile の変更を検知しました。プロジェクト ${project_name} のイメージを再ビルドします..."
+        log_info "Dockerfile の変更を検知しました。共通イメージを再ビルドします..."
         #$compose_cmd build --no-cache
         $compose_cmd build 
         echo "$current_checksum" > "$checksum_file"
-        log_success "プロジェクト ${project_name} のイメージを再ビルドしました！"
+        log_success "共通イメージを再ビルドしました！"
     fi
 }
 
@@ -370,16 +298,16 @@ build_env() {
     local compose_cmd=$(get_compose_cmd)
     local project_name=$(get_project_name)
     
-    log_info "Building container for project: $project_name..."
+    log_info "Building shared container image..."
     $compose_cmd build --no-cache
     #$compose_cmd build 
     
     # ビルド成功後にハッシュを保存
     if [ -f Dockerfile ]; then
-        sha256sum Dockerfile | awk '{print $1}' > ".dockerfile.${project_name}.sha256"
+        sha256sum Dockerfile | awk '{print $1}' > ".dockerfile.sha256"
     fi
     
-    log_success "Container built for project: $project_name!"
+    log_success "Shared container image built!"
     log_info "Use '$0 start' to start the new container"
 }
 

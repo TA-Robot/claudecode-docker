@@ -3,16 +3,18 @@ version: '3.8'
 
 services:
   claude-dev:
-    build: .
-    container_name: claude-dev-container
-    # Run as non-root user from the start
+    image: ${CLAUDE_DOCKER_IMAGE:-claude-code:latest}
+    build: 
+      context: .
+      dockerfile: Dockerfile
+    # container_name を削除してデフォルト名を使用
     user: "1000:1000"
     volumes:
-      # Mount projects directory (create if not exists)
+      # Mount projects directory
       - ./projects:/workspace/projects
       # Mount Claude configuration
       - ./claude-config:/home/developer/.claude
-      # Mount cache directories for persistence
+      # Mount cache directories
       - ./cache:/home/developer/.cache
       # Mount SSH keys if needed
       - ~/.ssh:/home/developer/.ssh:ro
@@ -24,6 +26,13 @@ services:
       # npm config
       - NPM_CONFIG_CACHE=/tmp/npm-cache
       - NPM_CONFIG_PREFIX=/home/developer/.npm-global
+    networks:
+      - claude-net
     stdin_open: true
     tty: true
     working_dir: /workspace/projects
+
+networks:
+  claude-net:
+    name: claude-network
+    driver: bridge

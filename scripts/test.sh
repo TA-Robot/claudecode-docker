@@ -62,9 +62,19 @@ else
     exit 1
 fi
 
+# Check docker-compose.yml exists
+echo "5. Checking docker-compose.yml..."
+if [ -f "docker-compose.yml" ]; then
+    echo "✓ docker-compose.yml exists"
+else
+    echo "✗ docker-compose.yml missing"
+    exit 1
+fi
+echo
+
 # Test Docker build
-echo "5. Testing Docker build..."
-if $COMPOSE_CMD build --no-cache; then
+echo "6. Testing Docker build..."
+if $COMPOSE_CMD  build --no-cache; then
     echo "✓ Docker build successful"
 else
     echo "✗ Docker build failed"
@@ -73,8 +83,8 @@ fi
 echo
 
 # Test container startup
-echo "6. Testing container startup..."
-if $COMPOSE_CMD up -d; then
+echo "7. Testing container startup..."
+if $COMPOSE_CMD  up -d; then
     echo "✓ Container started successfully"
     sleep 5
 else
@@ -84,35 +94,35 @@ fi
 echo
 
 # Test Claude Code installation inside container
-echo "7. Testing Claude Code installation..."
-if $COMPOSE_CMD exec -T claude-dev which claude; then
+echo "8. Testing Claude Code installation..."
+if $COMPOSE_CMD  exec -T claude-dev which claude; then
     echo "✓ Claude Code is installed"
-    $COMPOSE_CMD exec -T claude-dev claude --version || echo "Claude version check completed"
+    $COMPOSE_CMD  exec -T claude-dev claude --version || echo "Claude version check completed"
 else
     echo "✗ Claude Code is not installed or not accessible"
-    $COMPOSE_CMD down
+    $COMPOSE_CMD  down
     exit 1
 fi
 echo
 
 # Test configuration file
-echo "8. Testing configuration file..."
-if $COMPOSE_CMD exec -T claude-dev test -f /root/.config/claude/settings.json; then
+echo "9. Testing configuration file..."
+if $COMPOSE_CMD  exec -T claude-dev test -f /root/.config/claude/settings.json; then
     echo "✓ Configuration file exists"
     echo "Configuration content:"
-    $COMPOSE_CMD exec -T claude-dev head -n 10 /root/.config/claude/settings.json
+    $COMPOSE_CMD  exec -T claude-dev head -n 10 /root/.config/claude/settings.json
 else
     echo "✗ Configuration file missing"
 fi
 echo
 
 # Test volume mounts
-echo "9. Testing volume mounts..."
+echo "10. Testing volume mounts..."
 # Create test file on host
 echo "test content" > projects/test-file.txt
-if $COMPOSE_CMD exec -T claude-dev test -f /workspace/projects/test-file.txt; then
+if $COMPOSE_CMD  exec -T claude-dev test -f /workspace/projects/test-file.txt; then
     echo "✓ Volume mount working"
-    if $COMPOSE_CMD exec -T claude-dev cat /workspace/projects/test-file.txt | grep -q "test content"; then
+    if $COMPOSE_CMD  exec -T claude-dev cat /workspace/projects/test-file.txt | grep -q "test content"; then
         echo "✓ File content accessible"
     else
         echo "✗ File content not accessible"
@@ -122,15 +132,15 @@ else
 fi
 # Clean up test file
 rm -f projects/test-file.txt
-$COMPOSE_CMD exec -T claude-dev rm -f /workspace/projects/test-file.txt 2>/dev/null || true
+$COMPOSE_CMD  exec -T claude-dev rm -f /workspace/projects/test-file.txt 2>/dev/null || true
 echo
 
 # Test basic commands inside container
-echo "10. Testing basic commands..."
+echo "11. Testing basic commands..."
 commands=("node --version" "npm --version" "git --version" "python3 --version")
 for cmd in "${commands[@]}"; do
-    if $COMPOSE_CMD exec -T claude-dev bash -c "$cmd" &> /dev/null; then
-        version=$($COMPOSE_CMD exec -T claude-dev bash -c "$cmd" 2>&1 | head -n 1)
+    if $COMPOSE_CMD  exec -T claude-dev bash -c "$cmd" &> /dev/null; then
+        version=$($COMPOSE_CMD  exec -T claude-dev bash -c "$cmd" 2>&1 | head -n 1)
         echo "✓ $cmd: $version"
     else
         echo "✗ $cmd failed"
@@ -139,8 +149,8 @@ done
 echo
 
 # Clean up
-echo "11. Cleaning up..."
-$COMPOSE_CMD down
+echo "12. Cleaning up..."
+$COMPOSE_CMD  down
 echo "✓ Container stopped"
 echo
 
@@ -151,6 +161,6 @@ echo
 echo "To start developing:"
 echo "1. cp .env.example .env"
 echo "2. Edit .env with your Anthropic API key"
-echo "3. $COMPOSE_CMD up -d"
-echo "4. $COMPOSE_CMD exec claude-dev bash"
+echo "3. ./dev.sh start"
+echo "4. ./dev.sh shell"
 echo "5. Run 'claude' inside the container"

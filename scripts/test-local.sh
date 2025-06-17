@@ -58,7 +58,7 @@ else
     echo "✗ Projects volume mount missing"
 fi
 
-if grep -q "./claude-config:/root/.config/claude" docker-compose.yml; then
+if grep -q "./claude-config:/" docker-compose.yml; then
     echo "✓ Config volume mount configured"
 else
     echo "✗ Config volume mount missing"
@@ -184,9 +184,9 @@ echo "Manual Docker test steps:"
 echo "1. Ensure Docker and Docker Compose are installed and accessible"
 echo "2. Run: cp .env.example .env"
 echo "3. Edit .env with your Anthropic API key"
-echo "4. Run: docker-compose build"
-echo "5. Run: docker-compose up -d"
-echo "6. Run: docker-compose exec claude-dev bash"
+echo "4. Run: ./dev.sh build"
+echo "5. Run: ./dev.sh start"
+echo "6. Run: ./dev.sh shell"
 echo "7. Inside container, run: claude --version"
 echo "8. Test file sharing by creating files in /workspace/projects"
 echo
