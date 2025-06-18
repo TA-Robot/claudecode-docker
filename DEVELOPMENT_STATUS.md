@@ -169,6 +169,27 @@ docker-compose down
 
 ## 更新履歴
 
+### v1.5.0 (2025-01-18) - 開発環境拡張・サービス依存追加
+- **実装内容**: 開発に必要なシステムパッケージ、サービス依存、権限設定を包括的に追加
+- **理由**: 実際の開発プロジェクトで必要となる依存関係・ツールを事前に含めることで開発効率を向上
+- **テスト**: Docker再ビルド後に各サービスとの接続確認予定
+- **影響範囲**: Dockerfile、docker-compose.yml、.env.example、README.md、開発環境全体
+- **詳細追加**:
+  - **システムパッケージ**: postgresql-client, chromium-browser, netcat, nginx, redis-tools
+  - **Playwright対応**: 
+    - ブラウザ依存パッケージ追加（libnss3, libnspr4, libatk1.0-0等）
+    - 環境変数設定（PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1、PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH=/usr/bin/chromium-browser）
+  - **サービス追加**: PostgreSQL 14, Redis 7, Elasticsearch 8.11.3
+  - **ポート開放**: 3000 (Frontend), 4000 (Backend API), 5000 (MCP Server), 5432 (PostgreSQL), 6379 (Redis), 9200 (Elasticsearch)
+  - **ディレクトリ追加**: logs/, coverage/, test-results/ (権限777)
+  - **環境変数**: DATABASE_URL, REDIS_URL, ELASTICSEARCH_URL自動設定
+  - **ボリューム追加**: 各サービスのデータ永続化用ボリューム（postgres_data, redis_data, es_data）
+  - **Docker権限修正**:
+    - docker-compose.ymlに`group_add`設定追加（DOCKER_GIDで動的指定）
+    - .zshrcにDocker権限チェックと警告メッセージ追加
+    - .env.exampleとREADMEにDocker権限設定手順を記載
+- **次のステップ**: Docker再ビルドと実環境での動作確認
+
 ### v1.4.1 (2025-06-17) - USER切り替え後の環境変数問題修正
 - **実装内容**: Dockerfile内でUSER 1000切り替え後にHOME/USER環境変数が未設定だった問題を修正
 - **理由**: 環境変数未設定によりcurlのSSL接続が320秒タイムアウトし、oh-my-zshインストールが失敗

@@ -28,16 +28,17 @@ RUN apt-get update && apt-get install -y \
     lsb-release \
     software-properties-common \
     apt-transport-https \
+    postgresql-client \
+    chromium \
+    netcat-openbsd \
+    nginx \
+    redis-tools \
+    sudo \
     && rm -rf /var/lib/apt/lists/*
 
 # Generate Japanese locale
 RUN sed -i '/ja_JP.UTF-8/s/^# //g' /etc/locale.gen && \
     locale-gen
-
-# Create custom user and group with explicit UID/GID (Docker group will be added later)
-RUN groupadd -g 1000 developer 2>/dev/null || true && \
-    (useradd -u 1000 -g 1000 -m -d /home/developer -s /bin/zsh developer 2>/dev/null || \
-     usermod -s /bin/zsh -d /home/developer -g 1000 node)
 
 # Install Python and pip
 RUN apt-get update && apt-get install -y \
@@ -48,18 +49,32 @@ RUN apt-get update && apt-get install -y \
     python-is-python3 \
     && rm -rf /var/lib/apt/lists/*
 
-# Install Docker (Docker-in-Docker support) and add user to docker group
+# Install Docker (Docker-in-Docker support)
 RUN curl -fsSL https://download.docker.com/linux/debian/gpg | gpg --dearmor -o /usr/share/keyrings/docker-archive-keyring.gpg && \
     echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/docker-archive-keyring.gpg] https://download.docker.com/linux/debian $(lsb_release -cs) stable" | tee /etc/apt/sources.list.d/docker.list > /dev/null && \
     apt-get update && \
     apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin && \
     rm -rf /var/lib/apt/lists/* && \
-    # Add user to docker group after Docker installation
-    usermod -aG docker $(id -nu 1000) 2>/dev/null || usermod -aG docker developer 2>/dev/null || true && \
-    # Set Docker socket permissions (will be mounted from host)
-    touch /var/run/docker.sock && \
-    chgrp docker /var/run/docker.sock && \
-    chmod 660 /var/run/docker.sock
+    # Create docker group with common GIDs (try multiple common GIDs)
+    (groupadd -g 999 docker 2>/dev/null || groupadd -g 998 docker 2>/dev/null || groupadd docker 2>/dev/null || true)
+
+# Reuse existing node user (UID 1000) as developer
+RUN existing_user=$(getent passwd 1000 | cut -d: -f1) && \
+    if [ -n "$existing_user" ]; then \
+        # Rename existing user to developer
+        usermod -l developer -d /home/developer -m "$existing_user" && \
+        groupmod -n developer $(id -gn developer) && \
+        usermod -s /bin/zsh developer; \
+    else \
+        # Create new developer user if UID 1000 doesn't exist
+        groupadd -g 1000 developer && \
+        useradd -u 1000 -g 1000 -m -d /home/developer -s /bin/zsh developer; \
+    fi && \
+    # Add developer user to docker group (Docker group already exists from Docker installation)
+    usermod -aG docker developer && \
+    # Give docker command sudo access for permission fixes
+    echo "developer ALL=(ALL) NOPASSWD: /usr/bin/docker" > /etc/sudoers.d/developer-docker && \
+    chmod 0440 /etc/sudoers.d/developer-docker
 
 # Install additional development languages and tools
 RUN apt-get update && apt-get install -y \
@@ -75,6 +90,18 @@ RUN apt-get update && apt-get install -y \
     zip \
     tmux \
     screen \
+    # Playwright dependencies
+    libnss3 \
+    libnspr4 \
+    libatk1.0-0 \
+    libatk-bridge2.0-0 \
+    libcups2 \
+    libatspi2.0-0 \
+    libxdamage1 \
+    libgbm1 \
+    libgtk-3-0 \
+    libxss1 \
+    libasound2 \
     && rm -rf /var/lib/apt/lists/*
 
 # Install Rust (as root initially, will be configured for user later)
@@ -117,11 +144,21 @@ ENV NPM_CONFIG_PREFIX=/home/developer/.npm-global
 ENV NPM_CONFIG_CACHE=/tmp/npm-cache
 ENV PATH=$PATH:/home/developer/.npm-global/bin:/home/developer/.local/bin
 
+# Playwright environment variables
+ENV PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1
+ENV PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH=/usr/bin/chromium
+
 # Set working directory and create project directories with proper permissions
 WORKDIR /workspace
 RUN mkdir -p /workspace/projects && \
+    mkdir -p /workspace/logs && \
+    mkdir -p /workspace/coverage && \
+    mkdir -p /workspace/test-results && \
     chown -R 1000:1000 /workspace && \
-    chmod -R 755 /workspace
+    chmod -R 755 /workspace && \
+    chmod -R 777 /workspace/logs && \
+    chmod -R 777 /workspace/coverage && \
+    chmod -R 777 /workspace/test-results
 
 # Create directories with proper permissions
 RUN mkdir -p /home/developer/.npm-global && \
@@ -405,8 +442,13 @@ RUN echo '# Custom zsh configuration' >> /home/developer/.zshrc && \
     echo '' >> /home/developer/.zshrc && \
     echo '# Docker-in-Docker socket permissions fix' >> /home/developer/.zshrc && \
     echo 'if [[ -S /var/run/docker.sock ]]; then' >> /home/developer/.zshrc && \
-    echo '  # Docker socket should be pre-configured with proper permissions' >> /home/developer/.zshrc && \
-    echo '  # If not accessible, contact system administrator' >> /home/developer/.zshrc && \
+    echo '  # Check Docker access on shell startup' >> /home/developer/.zshrc && \
+    echo '  if ! docker version >/dev/null 2>&1; then' >> /home/developer/.zshrc && \
+    echo '    echo "⚠️  Docker socket is not accessible. You may need to:"' >> /home/developer/.zshrc && \
+    echo '    echo "   1. Ensure Docker socket is mounted with correct permissions"' >> /home/developer/.zshrc && \
+    echo '    echo "   2. Check if user is in docker group"' >> /home/developer/.zshrc && \
+    echo '    echo "   3. Restart the container after fixing permissions"' >> /home/developer/.zshrc && \
+    echo '  fi' >> /home/developer/.zshrc && \
     echo 'fi' >> /home/developer/.zshrc && \
     echo '' >> /home/developer/.zshrc && \
     echo '# Fix common permission issues on startup' >> /home/developer/.zshrc && \
@@ -431,6 +473,7 @@ ENV HISTFILE=/home/developer/.zsh_history
 # Create an entrypoint script to fix permissions on startup
 RUN echo '#!/bin/bash' > /home/developer/entrypoint.sh && \
     echo '# Fix permissions on startup automatically' >> /home/developer/entrypoint.sh && \
+    echo 'echo "[ENTRYPOINT] Starting entrypoint script..."' >> /home/developer/entrypoint.sh && \
     echo '' >> /home/developer/entrypoint.sh && \
     echo '# Ensure npm cache directory exists and is writable' >> /home/developer/entrypoint.sh && \
     echo 'rm -rf /tmp/npm-cache 2>/dev/null || true' >> /home/developer/entrypoint.sh && \
@@ -464,6 +507,32 @@ RUN echo '#!/bin/bash' > /home/developer/entrypoint.sh && \
     echo '  done' >> /home/developer/entrypoint.sh && \
     echo '  # Run comprehensive permission fix after all installs' >> /home/developer/entrypoint.sh && \
     echo '  /home/developer/bin/fix-jest-permissions.sh 2>/dev/null || true' >> /home/developer/entrypoint.sh && \
+    echo 'fi' >> /home/developer/entrypoint.sh && \
+    echo '' >> /home/developer/entrypoint.sh && \
+    echo '# Fix Docker socket permissions if needed' >> /home/developer/entrypoint.sh && \
+    echo 'if [[ -S /var/run/docker.sock ]]; then' >> /home/developer/entrypoint.sh && \
+    echo '  echo "[DOCKER] Docker socket found, checking permissions..."' >> /home/developer/entrypoint.sh && \
+    echo '  # Get the group ID of the docker socket' >> /home/developer/entrypoint.sh && \
+    echo '  DOCKER_GID=$(stat -c "%g" /var/run/docker.sock)' >> /home/developer/entrypoint.sh && \
+    echo '  echo "[DOCKER] Docker socket GID: $DOCKER_GID"' >> /home/developer/entrypoint.sh && \
+    echo '  # Check current user groups' >> /home/developer/entrypoint.sh && \
+    echo '  echo "[DOCKER] Current user: $(whoami)"' >> /home/developer/entrypoint.sh && \
+    echo '  echo "[DOCKER] Current groups: $(id -G)"' >> /home/developer/entrypoint.sh && \
+    echo '  # Check if docker group exists with correct GID' >> /home/developer/entrypoint.sh && \
+    echo '  CURRENT_DOCKER_GID=$(getent group docker | cut -d: -f3 2>/dev/null || echo "")' >> /home/developer/entrypoint.sh && \
+    echo '  if [ "$DOCKER_GID" != "$CURRENT_DOCKER_GID" ]; then' >> /home/developer/entrypoint.sh && \
+    echo '    echo "[DOCKER] Docker socket GID is $DOCKER_GID, but docker group GID is $CURRENT_DOCKER_GID"' >> /home/developer/entrypoint.sh && \
+    echo '    # Try to create a new group with the correct GID' >> /home/developer/entrypoint.sh && \
+    echo '    sudo groupadd -g $DOCKER_GID docker-host 2>/dev/null && echo "[DOCKER] Created docker-host group" || echo "[DOCKER] Failed to create docker-host group"' >> /home/developer/entrypoint.sh && \
+    echo '    sudo usermod -aG docker-host developer 2>/dev/null && echo "[DOCKER] Added to docker-host group" || echo "[DOCKER] Failed to add to docker-host group"' >> /home/developer/entrypoint.sh && \
+    echo '  fi' >> /home/developer/entrypoint.sh && \
+    echo '  # Check if we can access Docker socket' >> /home/developer/entrypoint.sh && \
+    echo '  if ! docker version >/dev/null 2>&1; then' >> /home/developer/entrypoint.sh && \
+    echo '    echo "[DOCKER] Still cannot access Docker socket."' >> /home/developer/entrypoint.sh && \
+    echo '    echo "[DOCKER] Please add DOCKER_GID=$DOCKER_GID to your .env file and restart the container."' >> /home/developer/entrypoint.sh && \
+    echo '  else' >> /home/developer/entrypoint.sh && \
+    echo '    echo "[DOCKER] Docker access working!"' >> /home/developer/entrypoint.sh && \
+    echo '  fi' >> /home/developer/entrypoint.sh && \
     echo 'fi' >> /home/developer/entrypoint.sh && \
     echo '' >> /home/developer/entrypoint.sh && \
     echo '# Execute the command' >> /home/developer/entrypoint.sh && \

@@ -21,6 +21,10 @@ Thumbs.db
 *.log
 logs/
 
+# Test and coverage files
+coverage/
+test-results/
+
 .temp/*
 .dockerfile.sha256
 .dockerfile.*.sha256

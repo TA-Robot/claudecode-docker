@@ -13,6 +13,11 @@ RED='\033[0;31m'
 CYAN='\033[0;36m'
 NC='\033[0m'
 
+# Auto-detect Docker GID at script start
+if [ -z "$DOCKER_GID" ]; then
+    export DOCKER_GID=$(stat -c %g /var/run/docker.sock 2>/dev/null || echo "999")
+fi
+
 # Helper functions
 log_info() {
     echo -e "${BLUE}[INFO]${NC} $1"
@@ -72,6 +77,8 @@ get_compose_cmd() {
     local dir_hash=$(pwd | sha256sum | cut -c1-8)
     local project_name="claude-${dir_hash}"
     export COMPOSE_PROJECT_NAME="$project_name"
+    
+    # DOCKER_GID is already set at script start
     
     if command -v docker-compose >/dev/null 2>&1; then
         echo "docker-compose -p $project_name"
@@ -180,6 +187,9 @@ rebuild_if_dockerfile_changed() {
 # Start environment
 start_env() {
     local compose_cmd=$(get_compose_cmd)
+    
+    # Show Docker GID info
+    log_info "Using Docker GID: $DOCKER_GID"
     
     # Dockerfile 変更チェック
     rebuild_if_dockerfile_changed
