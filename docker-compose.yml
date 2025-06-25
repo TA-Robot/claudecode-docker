@@ -17,7 +17,7 @@ services:
       # Mount Claude configuration
       - ./claude-config:/home/developer/.claude
       # Mount cache directories
-      - ./cache:/home/developer/.cache
+      # - ./cache:/home/developer/.cache  # Commented out to use container's own cache directory
       # Mount SSH keys if needed
       - ~/.ssh:/home/developer/.ssh:ro
       # Mount Docker socket for Docker-in-Docker
