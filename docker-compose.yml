@@ -16,6 +16,8 @@ services:
       - ./projects:/workspace/projects
       # Mount Claude configuration
       - ./claude-config:/home/developer/.claude
+      # Mount Google Cloud configuration for Gemini CLI
+      - $HOME/.config/gcloud:/home/developer/.config/gcloud:ro
       # Mount cache directories
       # - ./cache:/home/developer/.cache  # Commented out to use container's own cache directory
       # Mount SSH keys if needed
@@ -29,6 +31,7 @@ services:
     environment:
       # Set Claude API key from environment or .env file
       - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
+      - GOOGLE_CLOUD_PROJECT=${GOOGLE_CLOUD_PROJECT:-}
       # npm config
       - NPM_CONFIG_CACHE=/tmp/npm-cache
       - NPM_CONFIG_PREFIX=/home/developer/.npm-global
@@ -37,9 +40,9 @@ services:
       - REDIS_URL=redis://redis:6379
       - ELASTICSEARCH_URL=http://elasticsearch:9200
     ports:
-      - "3000:3000"  # Frontend
-      - "4000:4000"  # Backend API
-      - "5000:5000"  # MCP Server
+      - "3001:3000"  # Frontend
+      - "4001:4000"  # Backend API
+      - "5001:5000"  # MCP Server
     networks:
       - claude-net
     stdin_open: true
@@ -59,7 +62,7 @@ services:
     volumes:
       - postgres_data:/var/lib/postgresql/data
     ports:
-      - "5432:5432"
+      - "5433:5432"
     networks:
       - claude-net
 
@@ -69,7 +72,7 @@ services:
     volumes:
       - redis_data:/data
     ports:
-      - "6379:6379"
+      - "6380:6379"
     networks:
       - claude-net
 
@@ -82,8 +85,8 @@ services:
     volumes:
       - es_data:/usr/share/elasticsearch/data
     ports:
-      - "9200:9200"
-      - "9300:9300"
+      - "9201:9200"
+      - "9301:9300"
     networks:
       - claude-net
 

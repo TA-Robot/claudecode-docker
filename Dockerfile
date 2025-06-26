@@ -33,8 +33,10 @@ RUN apt-get update && apt-get install -y \
     netcat-openbsd \
     nginx \
     redis-tools \
-    sudo \
-    && rm -rf /var/lib/apt/lists/*
+    sudo     && rm -rf /var/lib/apt/lists/*
+
+# Install Google Cloud SDK
+RUN echo "deb [signed-by=/usr/share/keyrings/google-cloud.gpg] http://packages.cloud.google.com/apt cloud-sdk main" | tee -a /etc/apt/sources.list.d/google-cloud-sdk.list &&     curl https://packages.cloud.google.com/apt/doc/apt-key.gpg | apt-key --keyring /usr/share/keyrings/google-cloud.gpg add - &&     apt-get update && apt-get install -y google-cloud-cli
 
 # Generate Japanese locale
 RUN sed -i '/ja_JP.UTF-8/s/^# //g' /etc/locale.gen && \
@@ -108,11 +110,12 @@ RUN apt-get update && apt-get install -y \
 RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
 ENV PATH=\"/root/.cargo/bin:${PATH}\"
 
-# Set npm global permissions and install Claude Code
+# Set npm global permissions and install Claude Code and Gemini CLI
 RUN chown -R 1000:1000 /usr/local/lib/node_modules || true && \
     chmod -R 755 /usr/local/lib/node_modules || true && \
-    npm install -g @anthropic-ai/claude-code && \
+    npm install -g @anthropic-ai/claude-code @google/gemini-cli && \
     # Install common global npm tools with proper permissions
+
     npm install -g \
         typescript \
         ts-node \
@@ -536,8 +539,7 @@ RUN echo '#!/bin/bash' > /home/developer/entrypoint.sh && \
     echo 'fi' >> /home/developer/entrypoint.sh && \
     echo '' >> /home/developer/entrypoint.sh && \
     echo '# Execute the command' >> /home/developer/entrypoint.sh && \
-    echo 'exec "$@"' >> /home/developer/entrypoint.sh && \
-    chmod +x /home/developer/entrypoint.sh
+    echo 'exec "$@"' >> /home/developer/entrypoint.sh &&     echo '' >> /home/developer/entrypoint.sh &&     echo '# Set environment variables passed from docker-compose' >> /home/developer/entrypoint.sh &&     echo 'if [ -n "$GOOGLE_CLOUD_PROJECT" ]; then' >> /home/developer/entrypoint.sh &&     echo '  echo "export GOOGLE_CLOUD_PROJECT=$GOOGLE_CLOUD_PROJECT" >> /home/developer/.zshrc' >> /home/developer/entrypoint.sh &&     echo 'fi' >> /home/developer/entrypoint.sh &&     chmod +x /home/developer/entrypoint.sh
 
 # Set entrypoint
 ENTRYPOINT ["/home/developer/entrypoint.sh"]

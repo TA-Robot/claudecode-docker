@@ -1,6 +1,6 @@
-# Claude Code Docker Development Environment
+# AI Code Docker Development Environment
 
-Docker上でClaude Codeを使用するための開発環境テンプレートです。
+Docker上でClaude CodeとGemini CLIを使用するための統一開発環境テンプレートです。
 
 ## 最新バージョン: v1.5.0
 
@@ -12,6 +12,7 @@ Docker上でClaude Codeを使用するための開発環境テンプレートで
 
 ## 特徴
 
+- **マルチAI対応**: Claude CodeとGemini CLIをシームレスに切り替え可能
 - **共通Dockerイメージ**: 複数プロジェクトで同じイメージを共有
 - **プロジェクト分離**: 各ディレクトリのprojects/は独立してマウント
 - **自動コンテナ識別**: ディレクトリパスのハッシュでコンテナを自動識別
@@ -32,13 +33,21 @@ Docker上でClaude Codeを使用するための開発環境テンプレートで
 ### 2. 環境設定
 ```bash
 # .envファイルを作成（自動で作成されます）
-# .envファイルを編集してANTHROPIC_API_KEYを設定
+# .envファイルを編集して、以下を設定してください:
+# - ANTHROPIC_API_KEY (Claude Code用)
+# - GOOGLE_CLOUD_PROJECT (Gemini CLI用)
+
+# Gemini CLIを使用するには、ホストマシンでGoogle Cloudにログインしてください
+gcloud auth application-default login
 ```
 
 ### 3. 開発開始
 ```bash
 # 環境を起動してClaude Codeを開始
 ./dev.sh claude
+
+# Gemini CLIを開始
+./dev.sh gemini
 
 # または、コンテナに入って手動で作業
 ./dev.sh shell
@@ -75,7 +84,7 @@ Docker上でClaude Codeを使用するための開発環境テンプレートで
 ```bash
 cp .env.example .env
 ```
-`.env` ファイルを編集して、Anthropic API キーを設定してください。
+`.env` ファイルを編集して、`ANTHROPIC_API_KEY`と`GEMINI_API_KEY`を設定してください。
 
 #### 3. コンテナのビルドと起動
 ```bash
@@ -234,6 +243,7 @@ claudecode-docker/
 # 開発作業
 ./dev.sh shell              # コンテナシェルに入る
 ./dev.sh claude             # Claude Code直接起動
+./dev.sh gemini             # Gemini CLI直接起動
 
 # メンテナンス
 ./dev.sh build              # コンテナ再ビルド

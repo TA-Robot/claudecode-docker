@@ -127,6 +127,7 @@ show_help() {
     echo "  restart   - Restart the development environment"
     echo "  shell     - Enter the container shell"
     echo "  claude    - Start Claude Code in the container"
+    echo "  gemini    - Start Gemini CLI in the container"
     echo "  logs      - Show container logs"
     echo "  status    - Show container status"
     echo "  build     - Build/rebuild the container"
@@ -278,6 +279,42 @@ start_claude() {
     
     log_info "Starting Claude Code for project: $project_name"
     $compose_cmd exec -u 1000 claude-dev claude --dangerously-skip-permissions
+}
+
+# Start Gemini CLI directly
+start_gemini() {
+    local compose_cmd=$(get_compose_cmd)
+    local project_name=$(get_project_name)
+    
+    # Check if container is running
+    if ! $compose_cmd ps | grep -q "claude-dev.*Up"; then
+        log_warning "Container is not running. Starting environment..."
+        start_env
+        sleep 2
+    fi
+
+    # Copy Gemini credentials from host to container as a temporary fix
+    if [ -d "$HOME/.gemini" ]; then
+        log_info "Copying Gemini credentials from host to container..."
+        # Get container ID
+        local container_id=$($compose_cmd ps -q claude-dev)
+        if [ -n "$container_id" ]; then
+            # Remove existing .gemini dir in container to ensure a clean copy
+            $compose_cmd exec -u 0 claude-dev rm -rf /home/developer/.gemini
+            # Copy from host to container
+            docker cp "$HOME/.gemini" "$container_id:/home/developer/.gemini"
+            # Fix permissions
+            $compose_cmd exec -u 0 claude-dev chown -R 1000:1000 /home/developer/.gemini
+            log_success "Gemini credentials copied."
+        else
+            log_error "Could not find the claude-dev container."
+        fi
+    else
+        log_warning "Host Gemini credentials not found at ~/.gemini. Skipping copy."
+    fi
+    
+    log_info "Starting Gemini CLI for project: $project_name"
+    $compose_cmd exec -u 1000 claude-dev gemini --debug
 }
 
 # Show logs
@@ -433,6 +470,9 @@ main() {
             ;;
         claude)
             start_claude
+            ;;
+        gemini)
+            start_gemini
             ;;
         logs)
             show_logs

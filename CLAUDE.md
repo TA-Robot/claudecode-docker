@@ -28,7 +28,8 @@ Read README.md and DEVELOPMENT_STATUS.md
 
 #### 1. 開発履歴管理 (MANDATORY)
 - **開発状況の記録**: 全ての機能追加・バグ修正・変更を詳細に記録
-- **履歴の更新**: 作業完了時に必ずDEVELOPMENT_STATUS.mdまたは類似ファイルを更新
+- **履歴の更新**: 作業完了時に必ず`DEVELOPMENT_STATUS.md`を更新
+- **AIコンテキストの更新**: プロジェクトの構成（技術スタック、コマンド等）が変更された場合は、`CLAUDE.md`や`GEMINI.md`等のAIコンテキストファイルも更新
 - **変更ログ**: 何を、なぜ、どのように変更したかを明記
 - **タスク管理**: TodoやIssueでタスクを管理し、完了時にクローズ
 
