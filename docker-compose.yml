@@ -16,8 +16,12 @@ services:
       - ./projects:/workspace/projects
       # Mount Claude configuration
       - ./claude-config:/home/developer/.claude
+      # Mount Codex CLI configuration
+      - ./codex-config:/home/developer/.codex
       # Mount Google Cloud configuration for Gemini CLI
       - $HOME/.config/gcloud:/home/developer/.config/gcloud:ro
+      # Mount OpenAI configuration (for OpenAI/Codex related CLIs)
+      - $HOME/.config/openai:/home/developer/.config/openai:ro
       # Mount cache directories
       # - ./cache:/home/developer/.cache  # Commented out to use container's own cache directory
       # Mount SSH keys if needed
@@ -29,8 +33,9 @@ services:
       - ./coverage:/workspace/coverage
       - ./test-results:/workspace/test-results
     environment:
-      # Set Claude API key from environment or .env file
+      # API keys (optional). Prefer host-side credentials that are mounted/copied.
       - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
       - GOOGLE_CLOUD_PROJECT=${GOOGLE_CLOUD_PROJECT:-}
       # npm config
       - NPM_CONFIG_CACHE=/tmp/npm-cache

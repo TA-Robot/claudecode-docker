@@ -1,5 +1,8 @@
 FROM node:20
 
+# Optional: toggle Codex CLI installation at build-time
+ARG INSTALL_CODEX=true
+
 # Set timezone and locale
 ENV TZ=Asia/Tokyo
 ENV LANG=ja_JP.UTF-8
@@ -110,10 +113,10 @@ RUN apt-get update && apt-get install -y \
 RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
 ENV PATH=\"/root/.cargo/bin:${PATH}\"
 
-# Set npm global permissions and install Claude Code and Gemini CLI
+# Set npm global permissions and install CLIs
 RUN chown -R 1000:1000 /usr/local/lib/node_modules || true && \
     chmod -R 755 /usr/local/lib/node_modules || true && \
-    npm install -g @anthropic-ai/claude-code @google/gemini-cli && \
+    npm install -g @anthropic-ai/claude-code @google/gemini-cli @openai/codex || true && \
     # Install common global npm tools with proper permissions
 
     npm install -g \
@@ -141,6 +144,16 @@ RUN chown -R 1000:1000 /usr/local/lib/node_modules || true && \
     # Fix permissions for all global npm binaries
     chmod -R +x /usr/local/lib/node_modules/.bin/* 2>/dev/null || true && \
     chmod -R +x /usr/local/bin/* 2>/dev/null || true
+
+# Best-effort install of Codex CLI (optional; npm recommended, latest)
+RUN if [ "$INSTALL_CODEX" = "true" ]; then \
+      echo "Attempting to install Codex CLI via npm (latest)..." && \
+      npm config set registry https://registry.npmjs.org/ && \
+      (npm install -g @openai/codex-cli || true) && \
+      (command -v codex >/dev/null 2>&1 || command -v codex-cli >/dev/null 2>&1 || echo "Codex CLI not found; continuing without it"); \
+    else \
+      echo "Skipping Codex CLI installation (INSTALL_CODEX=$INSTALL_CODEX)"; \
+    fi
 
 # Configure npm for custom user
 ENV NPM_CONFIG_PREFIX=/home/developer/.npm-global

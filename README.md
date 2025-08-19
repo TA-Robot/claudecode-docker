@@ -33,12 +33,17 @@ Docker上でClaude CodeとGemini CLIを使用するための統一開発環境�
 ### 2. 環境設定
 ```bash
 # .envファイルを作成（自動で作成されます）
-# .envファイルを編集して、以下を設定してください:
-# - ANTHROPIC_API_KEY (Claude Code用)
-# - GOOGLE_CLOUD_PROJECT (Gemini CLI用)
+# .envファイルは任意です（ホストの認証情報を自動コピー/マウントします）
+# 追加で環境変数を使いたい場合のみ編集:
+# - ANTHROPIC_API_KEY (Claude Code用, 任意)
+# - GOOGLE_CLOUD_PROJECT (Gemini CLI用, 任意)
+# - OPENAI_API_KEY (Codex CLI用, 任意)
 
-# Gemini CLIを使用するには、ホストマシンでGoogle Cloudにログインしてください
-gcloud auth application-default login
+# ホスト側での認証設定（推奨）
+# - Claude:   ~/.claude を整備 → 自動コピー
+# - Gemini:   gcloud ADC (~/.config/gcloud) を自動マウント、~/.gemini は自動コピー
+# - OpenAI/Codex: ~/.config/openai を自動マウント、~/.codex は自動コピー
+# これによりコンテナ内でのログイン作業は不要です
 ```
 
 ### 3. 開発開始
@@ -48,6 +53,9 @@ gcloud auth application-default login
 
 # Gemini CLIを開始
 ./dev.sh gemini
+
+# Codex CLIを開始（CLIのインストールが必要な場合あり）
+./dev.sh codex
 
 # または、コンテナに入って手動で作業
 ./dev.sh shell
@@ -199,6 +207,8 @@ claudecode-docker/
 │   └── CLAUDE.md           # Claude Code設定テンプレート（TDD・履歴管理ルール含む）
 ├── claude-config/          # Claude Code設定ディレクトリ
 │   └── settings.json       # 自動承認設定
+├── codex-config/           # Codex CLI設定ディレクトリ
+│   └── settings.json       # Codex CLI設定
 ├── cache/                  # キャッシュディレクトリ
 ├── dev.sh                  # メイン管理スクリプト
 ├── setup.sh                # セットアップ（wrapper）
@@ -244,6 +254,7 @@ claudecode-docker/
 ./dev.sh shell              # コンテナシェルに入る
 ./dev.sh claude             # Claude Code直接起動
 ./dev.sh gemini             # Gemini CLI直接起動
+./dev.sh codex              # Codex CLI直接起動（未インストール時は手順案内）
 
 # メンテナンス
 ./dev.sh build              # コンテナ再ビルド
@@ -335,6 +346,20 @@ cp /workspace/projects/CLAUDE.md /workspace/projects/your-project/
 - `projects/` ディレクトリ内のファイルはホストマシンと同期されます
 - コンテナを削除してもプロジェクトファイルは保持されます
 - SSH キーはホストから読み取り専用でマウントされます
+
+## 認証とクレデンシャル
+
+- Claude: `~/.claude` をホストから `./claude-config` へ自動同期してマウント
+- Gemini: `~/.config/gcloud` をReadOnlyマウント、`~/.gemini` をコンテナの`/home/developer/.gemini`へコピー
+- OpenAI/Codex: `~/.config/openai` をReadOnlyマウント、`~/.codex` を `./codex-config` へ同期
+- `.env` の `ANTHROPIC_API_KEY` / `OPENAI_API_KEY` / `GOOGLE_CLOUD_PROJECT` は任意（ホスト側の認証を優先）
+- これらは `./dev.sh start` で自動処理。以降のコンテナ内ログイン操作は不要
+
+## Codex CLI について
+
+- `OPENAI_API_KEY` を `.env` に設定してください。
+- 初回はコンテナ内でCodex CLIのインストールが必要です。詳細は `CODEX.md` を参照してください。
+- 設定は `codex-config/` を `/home/developer/.codex` にマウントして提供します。
 
 ### Docker権限設定
 

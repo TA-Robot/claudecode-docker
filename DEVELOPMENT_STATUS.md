@@ -169,6 +169,59 @@ docker-compose down
 
 ## 更新履歴
 
+### [2025-08-19] - Housekeeping: .gitignore 再整備
+- 実装内容:
+  - `projects/` 直下の全面除外を廃止し、各プロジェクト配下の生成物のみを除外（例: `node_modules/`, `dist/`, `.next/`, `target/`, `__pycache__`, `.venv`, テスト/Playwright出力など）
+  - 秘密情報・資格情報の確実な除外（`claude-config/**`, `codex-config/**` をデフォルト除外、必要に応じて `.gitkeep` で空ディレクトリ保持）
+  - Docker/ツール生成物の除外強化（`.dockerfile*.sha256`, 生成されたcomposeファイル, `cache/`, `npm-cache/`）
+  - ログ/カバレッジ/一時ファイルの整理（`logs/`, `coverage/`, `test-results/`, `*.log`, `.nyc_output/`, PIDファイル等）
+  - OS/エディタ由来ファイルの除外（`.DS_Store`, `Thumbs.db`, `.idea/`, `.vscode/`）
+- 理由: 秘密情報の誤コミット防止と、ソースは追跡しつつ生成物のみ除外する方針への統一。マルチフレームワークでの開発ノイズ低減。
+- テスト: ローカルで `git status` にてノイズ減少を確認。代表的なフロント/バックエンド/テストツールの生成物が除外されることを静的確認。
+- 影響範囲: `.gitignore`、開発者のワークフロー（生成物の未追跡化、ソースの追跡継続）。
+- 注意: 追加で保持したいテンプレートは `!` で個別に unignore 可能。各プロジェクトで特有の生成物がある場合は、`projects/<name>/.gitignore` の追加を推奨。
+
+### [2025-08-19] - Hotfix: Codex CLI 自動導入とホストコピー安定化
+- **実装内容**:
+  - npmパッケージ名を`@openai/codex-cli`から正式な`@openai/codex`に修正
+  - `dev.sh codex`の導入フローを強化
+    - npm（最新）で`@openai/codex`をグローバル導入（レジストリ明示）
+    - PATH未解決時は`/home/developer/.npm-global/lib/node_modules/@openai/codex`を検出し、`/usr/local/bin/codex`ラッパーを自動生成
+    - さらに未検出の場合は、ホストのnpmグローバルから`@openai/codex`ディレクトリを丸ごとコピーし、ラッパーを生成
+  - Dockerfileのベストエフォート導入も`@openai/codex`に統一
+  - `CODEX.md`/`README.md`を`@openai/codex`ベースに更新
+- **理由**: 404（誤パッケージ名）およびシンボリックリンクのみコピーによる起動失敗の解消。ホスト認証を活用し、コンテナ内でログイン不要の体験を確実にするため。
+- **テスト**: `./dev.sh codex` 実行で npm 導入ログ（例: "added 11 packages"）後に起動成功を確認。
+- **影響範囲**: `dev.sh`, `Dockerfile`, `CODEX.md`, `README.md`
+- **注意**: npm取得が不可の場合でも、ホストに`@openai/codex`があれば自動コピーで起動可能。
+
+### [2025-08-15] - 機能追加: Codex CLI統合サポート
+- **実装内容**:
+  - `docker-compose.yml`: `codex-config` マウントと `OPENAI_API_KEY` 環境変数を追加
+  - `dev.sh`: `codex` サブコマンドを追加（未インストール時はインストール案内＋シェル起動）
+  - `.env.example`: `OPENAI_API_KEY` を追加
+  - `codex-config/`: Codex設定用ディレクトリと `settings.json` を追加
+  - `CODEX.md`: Codex CLIの導入・利用手順を追加
+  - `README.md`: Codex CLIのコマンド案内を追記
+- **理由**: 既存のClaude/Geminiに加え、Codex CLIも同一環境で利用可能にするため
+- **テスト**: ローカルで構成差分の静的確認（コマンド表示、環境変数伝播、ボリュームマウント）
+- **影響範囲**: 開発者のワークフロー（`./dev.sh codex` で起動可能）
+- **既知の注意**: Codex CLIはnpmの最新を使用（固定バージョンは採用しない方針）。ホストにある場合はホストバイナリをコピー。
+
+### [2025-08-15] - 仕様変更: ホスト認証情報の自動コピー/マウント
+- **実装内容**:
+  - `dev.sh start` 実行時にホストの認証情報を自動同期
+    - Claude: `~/.claude` → `./claude-config`（コピー）
+    - Codex: `~/.codex` → `./codex-config`（コピー）
+    - Gemini: `~/.gemini` をコンテナ `/home/developer/.gemini` へコピー
+  - `docker-compose.yml` で以下を自動マウント
+    - `~/.config/gcloud` → `/home/developer/.config/gcloud:ro`
+    - `~/.config/openai` → `/home/developer/.config/openai:ro`
+  - `README.md` を更新し、`.env` のAPIキーは任意であることを明記
+- **理由**: ホストでのログイン・認証設定をそのまま活用し、コンテナ内でのログイン作業を不要にするため
+- **テスト**: `./dev.sh start` 実行で各ディレクトリのコピー/マウントの動作を確認
+- **影響範囲**: 認証フローの簡略化（.envのAPIキー設定は任意に）
+
 ### [2025-06-26] - Hotfix: Gemini CLIの認証情報をコンテナにコピーする一時対応
 - **Implementation**: `./dev.sh gemini`実行時に、ホストの`~/.gemini`ディレクトリをコンテナ内の`/home/developer/.gemini`に`docker cp`でコピーし、所有権を修正する処理を追加しました。
 - **Reason**: コンテナ内でGemini CLIの認証が失敗する問題があり、その一時的な解決策として、ホストの認証情報を直接利用するためです。

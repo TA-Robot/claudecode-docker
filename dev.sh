@@ -92,14 +92,32 @@ get_compose_cmd() {
 
 # Copy credentials from host to container mount
 copy_credentials() {
-    if [[ -f "$HOME/.claude/.credentials.json" ]]; then
-        log_info "Copying Claude credentials..."
+    # Claude credentials: copy entire directory if present (prefer copy over bind mount for portability)
+    if [[ -d "$HOME/.claude" ]]; then
+        log_info "Syncing host ~/.claude -> ./claude-config ..."
+        mkdir -p ./claude-config
+        rsync -a --delete "$HOME/.claude/" ./claude-config/
+        chmod -R go-rwx ./claude-config 2>/dev/null || true
+        log_success "Claude credentials synced"
+    elif [[ -f "$HOME/.claude/.credentials.json" ]]; then
+        log_info "Copying Claude credentials file..."
         mkdir -p ./claude-config
         cp "$HOME/.claude/.credentials.json" ./claude-config/.credentials.json
         chmod 600 ./claude-config/.credentials.json
-        log_success "Credentials copied successfully"
+        log_success "Claude credential file copied"
     else
-        log_info "No credentials found at $HOME/.claude/.credentials.json"
+        log_info "No Claude credentials found at $HOME/.claude"
+    fi
+
+    # Codex credentials: copy ~/.codex to project config if present
+    if [[ -d "$HOME/.codex" ]]; then
+        log_info "Syncing host ~/.codex -> ./codex-config ..."
+        mkdir -p ./codex-config
+        rsync -a --delete "$HOME/.codex/" ./codex-config/
+        chmod -R go-rwx ./codex-config 2>/dev/null || true
+        log_success "Codex credentials synced"
+    else
+        log_info "No Codex config found at $HOME/.codex (optional)"
     fi
 }
 
@@ -128,6 +146,7 @@ show_help() {
     echo "  shell     - Enter the container shell"
     echo "  claude    - Start Claude Code in the container"
     echo "  gemini    - Start Gemini CLI in the container"
+    echo "  codex     - Start Codex CLI in the container"
     echo "  logs      - Show container logs"
     echo "  status    - Show container status"
     echo "  build     - Build/rebuild the container"
@@ -218,13 +237,25 @@ start_env() {
         log_info "Please edit .env and add your API key, then restart"
     fi
     
-    # Copy credentials before starting
+    # Copy/sync host-side credentials into mounted config dirs before start
     copy_credentials
     
     # Create override file based on credentials
     create_compose_override
     
     $compose_cmd up -d
+    
+    # After container is up, copy Gemini CLI credentials (if available) into container home
+    if [[ -d "$HOME/.gemini" ]]; then
+        log_info "Syncing Gemini credentials into container..."
+        local container_id=$($compose_cmd ps -q claude-dev)
+        if [[ -n "$container_id" ]]; then
+            $compose_cmd exec -u 0 claude-dev rm -rf /home/developer/.gemini || true
+            docker cp "$HOME/.gemini" "$container_id:/home/developer/.gemini"
+            $compose_cmd exec -u 0 claude-dev chown -R 1000:1000 /home/developer/.gemini
+            log_success "Gemini credentials synced"
+        fi
+    fi
     log_success "Environment started!"
     log_info "Use '$0 shell' to enter the container"
     log_info "Use '$0 claude' to start Claude Code directly"
@@ -315,6 +346,75 @@ start_gemini() {
     
     log_info "Starting Gemini CLI for project: $project_name"
     $compose_cmd exec -u 1000 claude-dev gemini --debug
+}
+
+# Start Codex CLI directly
+start_codex() {
+    local compose_cmd=$(get_compose_cmd)
+    local project_name=$(get_project_name)
+
+    # Ensure container is running
+    if ! $compose_cmd ps | grep -q "claude-dev.*Up"; then
+        log_warning "Container is not running. Starting environment..."
+        start_env
+        sleep 2
+    fi
+
+    log_info "Checking for Codex CLI in container..."
+    # Detect codex binary name (codex or codex-cli)
+    local detect_cmd='if command -v codex >/dev/null 2>&1; then echo codex; elif command -v codex-cli >/dev/null 2>&1; then echo codex-cli; else echo ""; fi'
+    local codex_bin=$($compose_cmd exec -T -u 1000 claude-dev bash -lc "$detect_cmd")
+
+    if [ -z "$codex_bin" ]; then
+        log_warning "Codex CLI not found. Attempting auto-install via npm (latest)..."
+        $compose_cmd exec -T -u 1000 claude-dev bash -lc "npm config set registry https://registry.npmjs.org/ && npm install -g @openai/codex || true"
+        # Ensure wrapper exists if package directory is present but bin not on PATH
+        $compose_cmd exec -T -u 0 claude-dev bash -lc '
+          PKG_DIR="/home/developer/.npm-global/lib/node_modules/@openai/codex";
+          if [ -d "$PKG_DIR" ] && ! command -v codex >/dev/null 2>&1; then
+            mkdir -p /usr/local/bin;
+            echo "#!/usr/bin/env bash" > /usr/local/bin/codex;
+            echo "exec node $PKG_DIR/bin/codex.js \"$@\"" >> /usr/local/bin/codex;
+            chmod +x /usr/local/bin/codex;
+            chown 1000:1000 /usr/local/bin/codex;
+          fi'
+        # Re-detect after install attempt/wrapper creation
+        codex_bin=$($compose_cmd exec -T -u 1000 claude-dev bash -lc "$detect_cmd")
+    fi
+
+    # Fallback A: copy host codex package into container if available
+    if [ -z "$codex_bin" ]; then
+        if command -v codex >/dev/null 2>&1; then
+            log_info "Found 'codex' on host. Attempting to copy full npm package..."
+            local host_npm_root
+            host_npm_root=$(npm root -g 2>/dev/null || echo "/usr/local/lib/node_modules")
+            local host_pkg_path="$host_npm_root/@openai/codex"
+            local container_id=$($compose_cmd ps -q claude-dev)
+            if [ -d "$host_pkg_path" ] && [ -n "$container_id" ]; then
+                $compose_cmd exec -u 0 claude-dev bash -lc "mkdir -p /usr/local/lib/node_modules/@openai && rm -rf /usr/local/lib/node_modules/@openai/codex"
+                docker cp "$host_pkg_path" "$container_id:/usr/local/lib/node_modules/@openai/"
+                $compose_cmd exec -u 0 claude-dev bash -lc "chown -R 1000:1000 /usr/local/lib/node_modules/@openai/codex && chmod -R a+rX /usr/local/lib/node_modules/@openai/codex && mkdir -p /usr/local/bin && printf '#!/usr/bin/env bash\nexec node /usr/local/lib/node_modules/@openai/codex/bin/codex.js \"$@\"\n' > /usr/local/bin/codex && chmod +x /usr/local/bin/codex && chown 1000:1000 /usr/local/bin/codex"
+                # Re-detect
+                codex_bin=$($compose_cmd exec -T -u 1000 claude-dev bash -lc "$detect_cmd")
+            fi
+        fi
+    fi
+
+    if [ -z "$codex_bin" ]; then
+        log_warning "Codex CLI is still not available."
+        echo ""
+        echo "To install inside container (one of the following):"
+        echo "  A) Host binary copy: ensure 'codex' exists on host PATH, then re-run './dev.sh codex'"
+        echo "  B) npm:              npm install -g @openai/codex"
+        echo "  C) From source:      see CODEX.md to install from repository"
+        echo ""
+        log_info "Opening container shell so you can install Codex CLI..."
+        $compose_cmd exec -u 1000 claude-dev zsh
+        return
+    fi
+
+    log_info "Starting Codex CLI ($codex_bin) for project: $project_name"
+    $compose_cmd exec -u 1000 claude-dev bash -lc "$codex_bin --version || true; exec $codex_bin"
 }
 
 # Show logs
@@ -473,6 +573,9 @@ main() {
             ;;
         gemini)
             start_gemini
+            ;;
+        codex)
+            start_codex
             ;;
         logs)
             show_logs

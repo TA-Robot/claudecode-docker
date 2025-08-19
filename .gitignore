@@ -1,34 +1,78 @@
-# Environment variables
+########################################
+# Environment & Secrets
+########################################
 .env
+.env.local
+.env.*.local
 
-# Docker volumes
-projects/*
-cache/*
-npm-cache/*
+# Local credentials/config (do not commit secrets)
+claude-config/**
+!claude-config/.gitkeep
+codex-config/**
+!codex-config/.gitkeep
 
-# Claude configuration with secrets
-claude-config/config.json
-claude-config/todos/*
-claude-config/projects/*
-claude-config/statsig/*
-claude-config/.credentials.json
-
-# OS generated files
-.DS_Store
-Thumbs.db
-
-# Logs
-*.log
-logs/
-
-# Test and coverage files
-coverage/
-test-results/
-
-.temp/*
+########################################
+# Docker / Tooling artifacts
+########################################
 .dockerfile.sha256
 .dockerfile.*.sha256
-
-# Docker Compose override file (dynamically generated)
 docker-compose.override.yml
 docker-compose.generated.yml
+cache/
+npm-cache/
+
+########################################
+# Logs, Coverage, Temp
+########################################
+logs/
+coverage/
+test-results/
+*.log
+.temp/
+.nyc_output/
+*.pid
+*.pid.lock
+
+########################################
+# OS / Editor junk
+########################################
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+
+########################################
+# Projects: common build & cache outputs
+# (Keep project sources tracked; ignore generated artifacts only)
+########################################
+projects/**/node_modules/
+projects/**/.next/
+projects/**/.nuxt/
+projects/**/.cache/
+projects/**/.parcel-cache/
+projects/**/dist/
+projects/**/build/
+projects/**/out/
+projects/**/.output/
+projects/**/.turbo/
+projects/**/.vercel/
+projects/**/.svelte-kit/
+projects/**/.vite/
+projects/**/.angular/
+projects/**/target/
+projects/**/.pytest_cache/
+projects/**/__pycache__/
+projects/**/.venv/
+projects/**/venv/
+projects/**/.mypy_cache/
+projects/**/.ruff_cache/
+projects/**/.tox/
+projects/**/.coverage
+projects/**/.coverage.*
+projects/**/coverage/
+projects/**/playwright-report/
+projects/**/test-results/
+projects/**/.idea/
+projects/**/.vscode/
+projects/**/.DS_Store
+projects/**/*.log
