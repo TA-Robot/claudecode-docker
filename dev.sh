@@ -406,7 +406,7 @@ start_codex() {
         echo "To install inside container (one of the following):"
         echo "  A) Host binary copy: ensure 'codex' exists on host PATH, then re-run './dev.sh codex'"
         echo "  B) npm:              npm install -g @openai/codex"
-        echo "  C) From source:      see CODEX.md to install from repository"
+        echo "  C) From source:      see AGENTS.md to install from repository"
         echo ""
         log_info "Opening container shell so you can install Codex CLI..."
         $compose_cmd exec -u 1000 claude-dev zsh

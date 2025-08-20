@@ -358,7 +358,7 @@ cp /workspace/projects/CLAUDE.md /workspace/projects/your-project/
 ## Codex CLI について
 
 - `OPENAI_API_KEY` を `.env` に設定してください。
-- 初回はコンテナ内でCodex CLIのインストールが必要です。詳細は `CODEX.md` を参照してください。
+- 初回はコンテナ内でCodex CLIのインストールが必要です。詳細は `AGENTS.md` を参照してください。
 - 設定は `codex-config/` を `/home/developer/.codex` にマウントして提供します。
 
 ### Docker権限設定

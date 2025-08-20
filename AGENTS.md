@@ -40,3 +40,87 @@
 ## Agent-Specific Notes
 - Claude Code: `./dev.sh claude`; per-project guidance in `projects/CLAUDE.md`.
 - Gemini CLI: `./dev.sh gemini` (ensure local `gcloud auth application-default login`).
+
+## Codex CLI
+
+This repository supports running Codex CLI alongside Claude Code and Gemini CLI.
+
+### Requirements
+- Prefer host-side auth synced into the container:
+  - `~/.codex` is auto-copied via `./codex-config` mount
+  - `~/.config/openai` is mounted read-only to `/home/developer/.config/openai`
+  - `OPENAI_API_KEY` in `.env` is optional (env-based auth)
+
+### Install
+- Auto attempt (recommended):
+  - `./dev.sh start && ./dev.sh codex`
+  - If not found, the script prints install hints and opens a shell
+- Manual (inside container):
+  - `npm config set registry https://registry.npmjs.org/`
+  - `npm install -g @openai/codex`
+  - Verify: `codex --version`
+
+Notes:
+- Distribution may change; follow official instructions if the package name changes.
+- Uses `OPENAI_API_KEY` if set.
+
+### Usage
+- Start env, then launch Codex CLI:
+  - `./dev.sh start`
+  - `./dev.sh codex`
+- If CLI is missing, resolution order:
+  - Try auto-install (npm latest)
+  - Create `/usr/local/bin/codex` wrapper if needed
+  - Copy host `@openai/codex` package if available
+  - Otherwise open an interactive shell with hints
+
+### Configuration
+- Host `codex-config/` → container `/home/developer/.codex`
+- Workspaces in `/workspace/projects` (from `./projects`)
+
+### Troubleshooting
+- Ensure `OPENAI_API_KEY` in `.env` if using env-based auth
+- Inside container, verify network and that `codex` is on PATH
+- See `README.md` and `DEVELOPMENT_STATUS.md` for environment guidance
+
+### Web Search via Gemini CLI (for Codex Agent)
+- Goal: Codex delegates web search to Gemini CLI and returns results with citations
+- Rules:
+  - Always use `gemini -p "<指示>"` for web search
+  - Do not fetch pages directly with curl; let Gemini browse
+  - Always include source URLs and access日時 in answers
+- How to use (direct):
+  - Enter container: `./dev.sh shell`
+  - Examples:
+    - General search: `gemini -p "Search the web for <topic>. Return 5–8 credible sources with title, URL, brief summaries, and include access date."`
+    - Fresh news: `gemini -p "Search the web for the latest updates about <topic> (past 30 days). Provide 5–8 reputable sources and include access date."`
+    - Docs lookup: `gemini -p "Search the web for the official documentation of <library>. Provide key links with titles and URLs, plus relevance notes. Include access date."`
+- Operational notes:
+  - Host `~/.config/gcloud` is mounted read-only; `~/.gemini` is copied on `./dev.sh start`
+  - Save logs under `/workspace/logs` if needed
+- Caching tip: do not modify Dockerfile for search; use run-time `gemini -p` to keep image cache effective
+
+#### Approval-Aware Protocol (Codex CLI)
+When performing web search from this harness (sandboxed, approvals on-request):
+
+1) Confirm scope: Clarify topic, timeframe, and language. If unspecified, propose a sensible default and ask for consent.
+2) Prefer host `gemini`: First check `command -v gemini`; if available, use it directly instead of starting the container.
+3) Ask once for approval before networked commands: Explain the exact `gemini -p` you will run and request approval to execute it.
+4) Minimal privileges: Do not start Docker or modify the environment unless strictly required. Avoid `./dev.sh start` unless the user explicitly asks to work inside the container.
+5) If approval is denied/unavailable: Provide a ready-to-copy `gemini -p "…"` command and ask the user to run it, then paste results.
+6) Always return citations: Include source URLs and access日時 (JST) in answers per the rules above.
+
+#### Common Pitfalls (and fixes)
+- Unnecessary container start: Do not call `./dev.sh start` just to run web search. Use host `gemini` if present.
+- Over-escalation: Avoid requesting escalated permissions for Docker operations when not needed. Only ask for approval to run the `gemini -p` command itself.
+- Skipping availability check: Always probe `gemini` availability first (`command -v gemini`).
+- Missing citations/timestamps: Ensure every item includes URL and `アクセス日時 (YYYY-MM-DD HH:mm JST)`.
+- Not following user intent: Confirm topic/timeframe; if the user says “なんでもいい”, default to a 24h world top-news search in Japanese.
+
+#### Standard Prompt Templates
+- News (JP, last 24h):
+  `gemini -p "最新の世界の主要ニュースを過去24時間に限定してWeb検索してください。6〜8件の信頼できるメディアを選び、各項目に(1)見出し、(2)要点の短い要約(2-3文)、(3)出典のURL、(4)アクセス日時(日本時間, YYYY-MM-DD HH:mm JST)を含めてください。偏りを避け、重複を省き、発表時刻が分かる場合は記載。最後に全体のトレンドを3-5行で簡潔にまとめてください。日本語で回答。"`
+- News (EN, last 24h):
+  `gemini -p "Search the web for the top world news from the past 24 hours. Return 6–8 reputable sources; for each include: (1) headline, (2) 2–3 sentence summary, (3) source URL, (4) access date/time in JST (YYYY-MM-DD HH:mm JST). Avoid duplicates and note publication times when available. Conclude with a 3–5 line trend summary."`
+
+These templates should be adapted to the user’s requested topic/timeframe/language and always return URLs with access日時.
