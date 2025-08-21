@@ -367,6 +367,8 @@ start_codex() {
 
     if [ -z "$codex_bin" ]; then
         log_warning "Codex CLI not found. Attempting auto-install via npm (latest)..."
+        # Ensure npm global prefix dir is writable by developer (fix root-owned leftovers from image build)
+        $compose_cmd exec -T -u 0 claude-dev bash -lc 'mkdir -p /home/developer/.npm-global/lib/node_modules && chown -R 1000:1000 /home/developer/.npm-global && chmod -R ug+rwX /home/developer/.npm-global'
         $compose_cmd exec -T -u 1000 claude-dev bash -lc "npm config set registry https://registry.npmjs.org/ && npm install -g @openai/codex || true"
         # Ensure wrapper exists if package directory is present but bin not on PATH
         $compose_cmd exec -T -u 0 claude-dev bash -lc '

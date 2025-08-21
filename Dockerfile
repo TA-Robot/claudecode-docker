@@ -208,7 +208,9 @@ RUN --mount=type=cache,target=/tmp/npm-cache,sharing=locked \
     if [ "$INSTALL_CODEX" = "true" ]; then pkgs="$pkgs @openai/codex"; fi; \
     npm install -g $pkgs || true; \
     chmod -R +x /usr/local/lib/node_modules/.bin/* 2>/dev/null || true; \
-    chmod -R +x /usr/local/bin/* 2>/dev/null || true
+    chmod -R +x /usr/local/bin/* 2>/dev/null || true; \
+    # Ensure developer owns npm global prefix to allow installs at runtime
+    chown -R 1000:1000 /home/developer/.npm-global 2>/dev/null || true
 
 # Switch to developer for user-level setup (stable)
 USER 1000
@@ -316,7 +318,7 @@ mkdir -p ~/.npm-global/lib/node_modules ~/.npm-global/bin
 [[ -d ~/.local/bin ]] || mkdir -p ~/.local/bin
 exit 0
 EOF
-    chmod +x /home/developer/entrypoint.sh
+RUN chmod +x /home/developer/entrypoint.sh
 
 # -----------------------------------------------------------------------------
 # DYNAMIC SECTION (changes often; keep at bottom)
@@ -324,6 +326,9 @@ EOF
 # AGENT NOTE: Place COPY of local config/content BELOW this line to avoid
 # busting cache of the heavy layers above. Only touch below unless absolutely
 # necessary.
+
+# Switch to root for dynamic copies and permissions
+USER root
 
 # Copy default configuration (these files change relatively often)
 COPY claude-config/ /home/developer/.claude/
@@ -336,6 +341,8 @@ RUN chmod +x /home/developer/bin/fix-npm-permissions.sh \
          /home/developer/bin/fix-jest-permissions.sh && \
     chown -R 1000:1000 /home/developer/.claude /home/developer/bin /home/developer/.npmrc
 
+# Return to developer user
+USER 1000
+
 # Final working dir inside container
 WORKDIR /workspace
-
