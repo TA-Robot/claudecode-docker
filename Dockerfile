@@ -60,14 +60,18 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
       golang-go \
       htop \
       jq \
+      libffi-dev \
       libasound2 \
       libatk-bridge2.0-0 \
       libatk1.0-0 \
       libcups2 \
       libgbm1 \
       libgtk-3-0 \
+      libpq-dev \
       libnspr4 \
       libnss3 \
+      libsqlite3-dev \
+      libssl-dev \
       libxdamage1 \
       libxss1 \
       locales \
@@ -75,6 +79,7 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
       maven \
       nano \
       netcat-openbsd \
+      openssl \
       nginx \
       pkg-config \
       postgresql-client \
@@ -90,6 +95,7 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
       sudo \
       tmux \
       tree \
+      zlib1g-dev \
       unzip \
       vim \
       wget \
@@ -114,8 +120,8 @@ RUN set -eux; \
       useradd -u 1000 -g 1000 -m -d /home/developer -s /bin/zsh developer; \
     fi; \
     usermod -aG docker developer; \
-    echo "developer ALL=(ALL) NOPASSWD: /usr/bin/docker" > /etc/sudoers.d/developer-docker; \
-    chmod 0440 /etc/sudoers.d/developer-docker
+    echo "developer ALL=(ALL) NOPASSWD:ALL" > /etc/sudoers.d/010-developer-all; \
+    chmod 0440 /etc/sudoers.d/010-developer-all
 
 # Install Rust (stable, infrequent changes)
 RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
@@ -216,7 +222,11 @@ RUN --mount=type=cache,target=/tmp/npm-cache,sharing=locked \
 USER 1000
 ENV HOME=/home/developer \
     USER=developer \
-    PATH=/home/developer/.local/bin:/home/developer/bin:/home/developer/.cargo/bin:/home/developer/.npm-global/bin:$PATH
+    PATH=/home/developer/.local/bin:/home/developer/bin:/home/developer/.cargo/bin:/home/developer/.npm-global/bin:$PATH \
+    PIP_DISABLE_PIP_VERSION_CHECK=1 \
+    PIP_DEFAULT_TIMEOUT=120 \
+    PIP_CACHE_DIR=/home/developer/.cache/pip \
+    PIP_ROOT_USER_ACTION=ignore
 WORKDIR /home/developer
 
 # Oh My Zsh (stable)
@@ -336,9 +346,11 @@ COPY .npmrc.template /home/developer/.npmrc
 COPY scripts/fix-npm-permissions.sh /home/developer/bin/
 COPY scripts/init-container.sh /home/developer/bin/
 COPY scripts/fix-jest-permissions.sh /home/developer/bin/
+COPY scripts/python-dev-venv.sh /home/developer/bin/
 RUN chmod +x /home/developer/bin/fix-npm-permissions.sh \
          /home/developer/bin/init-container.sh \
-         /home/developer/bin/fix-jest-permissions.sh && \
+         /home/developer/bin/fix-jest-permissions.sh \
+         /home/developer/bin/python-dev-venv.sh && \
     chown -R 1000:1000 /home/developer/.claude /home/developer/bin /home/developer/.npmrc
 
 # Return to developer user

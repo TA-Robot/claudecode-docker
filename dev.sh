@@ -23,6 +23,7 @@ log_info() {
     echo -e "${BLUE}[INFO]${NC} $1"
 }
 
+
 log_success() {
     echo -e "${GREEN}[SUCCESS]${NC} $1"
 }
@@ -147,6 +148,7 @@ show_help() {
     echo "  claude    - Start Claude Code in the container"
     echo "  gemini    - Start Gemini CLI in the container"
     echo "  codex     - Start Codex CLI in the container"
+    echo "  mcp-playwright [install|run] - Install/Run Playwright MCP"
     echo "  logs      - Show container logs"
     echo "  status    - Show container status"
     echo "  build     - Build/rebuild the container"
@@ -419,6 +421,45 @@ start_codex() {
     $compose_cmd exec -u 1000 claude-dev bash -lc "$codex_bin --version || true; exec $codex_bin"
 }
 
+# Playwright MCP helper (install/run inside container)
+mcp_playwright() {
+    local compose_cmd=$(get_compose_cmd)
+    local project_name=$(get_project_name)
+    local subcmd=${2:-run}
+
+    # Ensure container is running
+    if ! $compose_cmd ps | grep -q "claude-dev.*Up"; then
+        log_warning "Container is not running. Starting environment..."
+        start_env
+        sleep 2
+    fi
+
+    case "$subcmd" in
+        install)
+            log_info "Installing Playwright MCP in container..."
+            $compose_cmd exec -T -u 1000 claude-dev bash -lc '
+              set -e
+              npm config set registry https://registry.npmjs.org/
+              if ! npm ls -g --depth=0 @microsoft/playwright-mcp >/dev/null 2>&1; then
+                npm install -g @microsoft/playwright-mcp || npm install -g playwright-mcp || npm install -g github:microsoft/playwright-mcp
+              fi
+              # Ensure browsers are available for Playwright (Chromium)
+              npx -y playwright@latest install chromium || npx playwright install chromium || true
+              echo "Playwright MCP installation attempted. Verify with: playwright-mcp --help"'
+            log_success "Playwright MCP install step completed"
+            ;;
+        run|start)
+            shift 2 || true
+            local args="$*"
+            log_info "Starting Playwright MCP server in container..."
+            $compose_cmd exec -u 1000 claude-dev bash -lc "if ! command -v playwright-mcp >/dev/null 2>&1; then echo 'playwright-mcp is not installed. Run: ./dev.sh mcp-playwright install' >&2; exit 1; fi; exec playwright-mcp $args"
+            ;;
+        *)
+            echo "Usage: $0 mcp-playwright [install|run] [extra args...]"
+            ;;
+    esac
+}
+
 # Show logs
 show_logs() {
     local compose_cmd=$(get_compose_cmd)
@@ -578,6 +619,9 @@ main() {
             ;;
         codex)
             start_codex
+            ;;
+        mcp-playwright)
+            mcp_playwright "$@"
             ;;
         logs)
             show_logs
