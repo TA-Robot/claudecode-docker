@@ -130,3 +130,16 @@ When performing web search from this harness (sandboxed, approvals on-request):
   `gemini -p "Search the web for the top world news from the past 24 hours. Return 6–8 reputable sources; for each include: (1) headline, (2) 2–3 sentence summary, (3) source URL, (4) access date/time in JST (YYYY-MM-DD HH:mm JST). Avoid duplicates and note publication times when available. Conclude with a 3–5 line trend summary."`
 
 These templates should be adapted to the user’s requested topic/timeframe/language and always return URLs with access日時.
+
+#### Proactive Search Policy（強化指針）
+- 次の状況では、既存の Approval-Aware Protocol に従い、原則として Gemini 検索を発火すること。
+  - 最新情報や仕様変更の可能性が高い領域（API/SDK バージョン、ライセンス、脆弱性、クラウド料金/制限）。
+  - 初見/不明なエラー、スタックトレース、再現が難しい不具合の切り分け時。
+  - 自信度が低い（根拠が薄い）と判断した場合、または複数解法のトレードオフ比較が必要な場合。
+  - セキュリティ/コンプライアンスに影響する判断（権限、秘密情報、ネットワーク到達性など）。
+  - 外部サービス/CLI のフラグ・環境変数・設定キーの正確性検証が必要な場合（例: タイムアウト/リトライ設定）。
+  - 非標準/特殊環境（OSディストリ、アーキテクチャ、社内ミラー等）でのインストール・運用手順の差異確認。
+- 実施時の原則:
+  - 1回の承認で必要最小限の検索をまとめて実行（連続承認は避ける）。
+  - 回答には常に根拠（URL＋アクセス日時JST）を付す。確証が弱い場合はその旨を明記。
+  - 公式一次情報（公式Docs/リリースノート/Issue/PR）を優先し、ブログ/フォーラムは補助根拠として扱う。

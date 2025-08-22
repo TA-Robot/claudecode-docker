@@ -9,6 +9,7 @@
 - **`setup-windows.ps1`** - Windowsセットアップスクリプト（PowerShell）
 - **`setup-minimal.sh`** - 最小セットアップ（Docker既存環境用）
 - **`install-compose.sh`** - Docker Compose個別インストール
+- **`playwright-mcp.sh`** - Playwright MCP のホスト側インストール/実行補助
 
 ### テスト関連
 - **`test.sh`** - 完全なDocker環境テスト
@@ -32,6 +33,18 @@ cd scripts
 # ルートディレクトリのdev.shを使用
 ./dev.sh setup    # セットアップ
 ./dev.sh test     # テスト実行
+
+### Playwright MCP（ホスト側）
+```bash
+# インストール（npmグローバル）。権限が必要な場合は sudo を付与
+./scripts/playwright-mcp.sh install
+
+# 起動（引数はそのまま渡せます）
+./scripts/playwright-mcp.sh run --help
+
+# 状態確認
+./scripts/playwright-mcp.sh status
+```
 ```
 
 ## スクリプト詳細

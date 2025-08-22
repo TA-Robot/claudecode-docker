@@ -169,6 +169,33 @@ docker-compose down
 
 ## 更新履歴
 
+### [2025-08-22] - 仕様変更: `projects/` は開発対象外に明確化 + 追跡方針変更
+- 実装内容:
+  - ドキュメントに「開発対象スコープ（重要）」を明記（`AGENTS.md`, `CLAUDE.md`, `README.md`, `GEMINI.md`）。
+    - 本リポの開発対象はテンプレート（環境スクリプト・Docker構成・共通ドキュメント）に限定。
+    - `projects/<name>` はこのテンプレートを“利用する”別プロジェクトとして扱い、原則対象外。
+  - `.gitignore` を更新し、`projects/*` をデフォルト除外（ただし `projects/*.md`, `.gitkeep` は追跡）。
+- 理由: テンプレートと利用プロジェクトの責務分離を強化し、誤コミット防止とレビュー範囲の明確化を図るため。
+- 影響範囲: ドキュメント一式、`.gitignore`。既に追跡済みの `projects/` 配下ファイルは手動で `git rm --cached` が必要。
+
+### [2025-08-22] - 機能追加: Playwright MCP（ホスト側）インストール/実行ヘルパー
+- 実装内容:
+  - `scripts/playwright-mcp.sh` を追加（host用）。
+    - `install`: `npm -g` に `playwright-mcp` を導入（GitHub へのフォールバック含む）、`npx playwright install chromium` を試行。
+    - `run [args]`: `playwright-mcp` を起動（引数透過）。
+    - `status`/`uninstall`: 状態確認/アンインストール。
+  - `README.md` と `scripts/README.md` にホスト側セットアップ手順を追記。
+  - `scripts/test.sh` にホストヘルパーの存在/実行権限チェックを追加。
+- 理由: コンテナではなくホスト上で Web 閲覧（MCP）を可能にするための運用要件に対応。
+- テスト: ホストで `sudo ./scripts/playwright-mcp.sh install` → `run --help` → `status` を実行し、導入/起動を確認（ネットワーク/権限前提）。
+
+### [2025-08-22] - Revert: Codex CLI タイムアウト環境変数の付与を撤回
+- 実装内容:
+  - `dev.sh` の `start_codex()` に一時追加していた `OPENAI_*` などのタイムアウト関連環境変数注入を削除。
+  - `codex-config/config.toml` に追加した `defaults` セクション（`openai_timeout_ms`, `openai_max_retries`）を削除。
+- 理由: 公式CLI設定に存在しないキーの導入は不適切であり、期待通りの効果を保証できないため。
+- 影響範囲: `dev.sh`, `codex-config/config.toml`（元の挙動へ復元）。
+
 ### [2025-08-19] - Housekeeping: .gitignore 再整備
 - 実装内容:
   - `projects/` 直下の全面除外を廃止し、各プロジェクト配下の生成物のみを除外（例: `node_modules/`, `dist/`, `.next/`, `target/`, `__pycache__`, `.venv`, テスト/Playwright出力など）

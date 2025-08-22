@@ -158,6 +158,18 @@ export CLAUDE_DOCKER_IMAGE="my-shared-claude:latest"
 ./dev.sh env            # 環境チェック
 ```
 
+### Playwright MCP（ホスト側セットアップ）
+```bash
+# インストール（npm グローバル。必要なら sudo を付与）
+./scripts/playwright-mcp.sh install
+
+# 起動（引数はそのまま渡せます）
+./scripts/playwright-mcp.sh run --help
+
+# 状態確認
+./scripts/playwright-mcp.sh status
+```
+
 ### プロジェクトの作成
 ```bash
 # 環境に入る
@@ -174,6 +186,14 @@ claude
 
 ### ファイル編集
 `./projects/` ディレクトリはホストマシンとマウントされているため、お好みのエディタで編集できます。
+
+## Web閲覧 (MCP) 対応: Playwright MCP（ホスト）
+
+- 目的: Claude Code 等の MCP クライアントから Playwright を用いた Web 閲覧ツールをホスト側で利用可能にする。
+- セットアップ/実行: 上記「Playwright MCP（ホスト側セットアップ）」を参照。
+- MCPクライアント設定例（参考）:
+  - コマンド起動型 MCP クライアントに `playwright-mcp` を登録（command: `playwright-mcp`）。
+  - 具体的な登録手順はクライアント側ドキュメントに従ってください。
 
 ## マルチプロジェクト対応 (v1.4.0+)
 
