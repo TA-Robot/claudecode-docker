@@ -42,37 +42,15 @@ Thumbs.db
 .vscode/
 
 ########################################
-# Projects: common build & cache outputs
-# (Keep project sources tracked; ignore generated artifacts only)
+# Projects: exclude internal app code
+# (This repo tracks only the environment template docs.)
 ########################################
-projects/**/node_modules/
-projects/**/.next/
-projects/**/.nuxt/
-projects/**/.cache/
-projects/**/.parcel-cache/
-projects/**/dist/
-projects/**/build/
-projects/**/out/
-projects/**/.output/
-projects/**/.turbo/
-projects/**/.vercel/
-projects/**/.svelte-kit/
-projects/**/.vite/
-projects/**/.angular/
-projects/**/target/
-projects/**/.pytest_cache/
-projects/**/__pycache__/
-projects/**/.venv/
-projects/**/venv/
-projects/**/.mypy_cache/
-projects/**/.ruff_cache/
-projects/**/.tox/
-projects/**/.coverage
-projects/**/.coverage.*
-projects/**/coverage/
-projects/**/playwright-report/
-projects/**/test-results/
-projects/**/.idea/
-projects/**/.vscode/
-projects/**/.DS_Store
-projects/**/*.log
+# Ignore everything under projects/
+projects/*
+# But keep top-level docs (status/context shared by template)
+!projects/*.md
+!projects/.gitkeep
+
+# Safety: if you later want to track specific shared files, unignore explicitly.
+# Example:
+# !projects/README.md
