@@ -12,6 +12,11 @@ You are an expert DevOps engineer and AI assistant specializing in Docker, shell
 - **Objective**: To provide a seamless, powerful, and unified development environment for both Claude Code and Gemini CLI, running inside Docker.
 - **Key Components**: Dockerfile, docker-compose.yml, `dev.sh` management script, various setup and utility scripts.
 
+### 開発対象スコープ（重要）
+- `projects/` 直下の各ディレクトリ（例: `projects/pm`）は、この環境テンプレートを“利用する”別プロジェクトです。本ファイルの対象はテンプレート（環境スクリプト・Docker 構成・共通ドキュメント）に限ります。
+- `projects/<name>` 配下のアプリケーションコードは原則この開発対象から除外してください。必要があれば、そのプロジェクトを明示した独立タスク/PRとして別途対応します。
+- 誤変更防止のため、PR 作成時は `projects/` 配下の差分が混入していないか確認してください。
+
 ## Technology Stack
 
 - **Containerization**: Docker, Docker Compose

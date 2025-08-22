@@ -7,6 +7,11 @@ This is a default configuration file for Claude Code in Docker environment.
 - **Technology Stack**: docker, shell, etc.
 - **Framework**: a lot.
 
+### 開発対象スコープ（重要）
+- `projects/` 直下の各ディレクトリ（例: `projects/pm`）は、この環境テンプレートを“利用する”別プロジェクトです。本ファイルで扱う開発対象はテンプレート（環境スクリプト・Docker 構成・共通ドキュメント）に限ります。
+- `projects/<name>` 配下のアプリケーションコードは原則この開発対象から除外してください。必要があれば、そのプロジェクトを明示した独立タスク/PRとして別途対応します。
+- 誤変更防止のため、PR 作成時は `projects/` 配下の差分が混入していないか確認してください。
+
 ## Development Commands
 
 ### Build Commands

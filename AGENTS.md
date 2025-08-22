@@ -6,6 +6,12 @@
 - `scripts/`: Host-side utility scripts (setup, tests, fixes).
 - Root files: `Dockerfile`, `docker-compose.yml`, `.env(.example)`, `dev.sh`, `setup.sh`.
 
+### 開発対象スコープ（重要）
+- `projects/` 直下の各サブディレクトリ（例: `projects/pm`）は、この開発環境テンプレートを“利用する”別個のアプリケーション/プロジェクトです。
+- 本リポジトリの開発対象は、環境スクリプト・Docker 構成・共通ドキュメント等（このテンプレート自体）に限定します。`projects/<name>` の実装は原則対象外です。
+- もし `projects/<name>` に変更が必要な場合は、そのプロジェクトを明示した独立タスク/PRとして取り扱い、本テンプレート改修とは分離してください。
+- 誤って `projects/` 直下を編集・コミットに含めないよう、作業ブランチやPRの範囲を確認してください。
+
 ## Build, Test, and Development Commands
 - `./setup.sh`: One-time environment setup (installs/validates Docker, creates `.env`).
 - `./dev.sh start|stop|restart|status`: Manage the development stack.
