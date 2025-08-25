@@ -169,6 +169,16 @@ docker-compose down
 
 ## 更新履歴
 
+### [2025-08-22] - 多重起動対応: ポートとネットワークの衝突回避
+- 実装内容:
+  - `docker-compose.yml` の公開ポートを環境変数化（`HOST_PORT_*`）。
+  - `dev.sh` で作業ディレクトリのハッシュから `PORT_OFFSET` を算出し、各 `HOST_PORT_*` を自動割当て。
+  - `./dev.sh start` と `./dev.sh status` でホスト側ポートを表示。
+  - Compose ネットワークの固定名を削除し、プロジェクト単位の分離を有効化。
+- 使い方:
+  - そのまま `./dev.sh start` すれば同一ホストで複数インスタンスを起動可能。
+  - 固定ポートを使いたい場合は `.env` で `HOST_PORT_*` もしくは `PORT_OFFSET` を指定。
+
 ### [2025-08-22] - 仕様変更: `projects/` は開発対象外に明確化 + 追跡方針変更
 - 実装内容:
   - ドキュメントに「開発対象スコープ（重要）」を明記（`AGENTS.md`, `CLAUDE.md`, `README.md`, `GEMINI.md`）。

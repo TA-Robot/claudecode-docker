@@ -79,6 +79,23 @@ get_compose_cmd() {
     local project_name="claude-${dir_hash}"
     export COMPOSE_PROJECT_NAME="$project_name"
     
+    # Derive deterministic per-instance port offset from directory hash (0-999)
+    # Allow manual override via environment: set HOST_PORT_* or PORT_OFFSET before running this script
+    if [ -z "${PORT_OFFSET:-}" ]; then
+        # Convert 8-hex hash to decimal and mod 1000
+        local dec=$((16#${dir_hash}))
+        export PORT_OFFSET=$(( dec % 1000 ))
+    fi
+    
+    # Only set dynamic ports if not already provided by user or .env file
+    if [ -z "${HOST_PORT_FE:-}" ] && ! grep -q '^HOST_PORT_FE=' .env 2>/dev/null; then export HOST_PORT_FE=$((3001 + PORT_OFFSET)); fi
+    if [ -z "${HOST_PORT_BE:-}" ] && ! grep -q '^HOST_PORT_BE=' .env 2>/dev/null; then export HOST_PORT_BE=$((4001 + PORT_OFFSET)); fi
+    if [ -z "${HOST_PORT_MCP:-}" ] && ! grep -q '^HOST_PORT_MCP=' .env 2>/dev/null; then export HOST_PORT_MCP=$((5001 + PORT_OFFSET)); fi
+    if [ -z "${HOST_PORT_PG:-}" ] && ! grep -q '^HOST_PORT_PG=' .env 2>/dev/null; then export HOST_PORT_PG=$((5433 + PORT_OFFSET)); fi
+    if [ -z "${HOST_PORT_REDIS:-}" ] && ! grep -q '^HOST_PORT_REDIS=' .env 2>/dev/null; then export HOST_PORT_REDIS=$((6380 + PORT_OFFSET)); fi
+    if [ -z "${HOST_PORT_ES_HTTP:-}" ] && ! grep -q '^HOST_PORT_ES_HTTP=' .env 2>/dev/null; then export HOST_PORT_ES_HTTP=$((9201 + PORT_OFFSET)); fi
+    if [ -z "${HOST_PORT_ES_TRANSPORT:-}" ] && ! grep -q '^HOST_PORT_ES_TRANSPORT=' .env 2>/dev/null; then export HOST_PORT_ES_TRANSPORT=$((9301 + PORT_OFFSET)); fi
+    
     # DOCKER_GID is already set at script start
     
     if command -v docker-compose >/dev/null 2>&1; then
@@ -246,6 +263,14 @@ start_env() {
     create_compose_override
     
     $compose_cmd up -d
+    
+    log_info "Published ports (host -> container):"
+    echo "  FE:    ${HOST_PORT_FE} -> 3000"
+    echo "  API:   ${HOST_PORT_BE} -> 4000"
+    echo "  MCP:   ${HOST_PORT_MCP} -> 5000"
+    echo "  PG:    ${HOST_PORT_PG} -> 5432"
+    echo "  Redis: ${HOST_PORT_REDIS} -> 6379"
+    echo "  ES:    ${HOST_PORT_ES_HTTP} -> 9200, ${HOST_PORT_ES_TRANSPORT} -> 9300"
     
     # After container is up, copy Gemini CLI credentials (if available) into container home
     if [[ -d "$HOME/.gemini" ]]; then
@@ -479,9 +504,13 @@ show_status() {
     
     if $compose_cmd ps | grep -q "claude-dev.*Up"; then
         log_success "Environment is running for project: $project_name"
-        log_info "Container details:"
-        docker exec -u 1000 "claude-dev-${project_name}" uname -a 2>/dev/null || true
-        docker exec -u 1000 "claude-dev-${project_name}" claude --version 2>/dev/null || log_warning "Claude Code not responding"
+        log_info "Port mappings (host -> container):"
+        printf "  FE:    %s -> 3000\n" "${HOST_PORT_FE}"
+        printf "  API:   %s -> 4000\n" "${HOST_PORT_BE}"
+        printf "  MCP:   %s -> 5000\n" "${HOST_PORT_MCP}"
+        printf "  PG:    %s -> 5432\n" "${HOST_PORT_PG}"
+        printf "  Redis: %s -> 6379\n" "${HOST_PORT_REDIS}"
+        printf "  ES:    %s -> 9200, %s -> 9300\n" "${HOST_PORT_ES_HTTP}" "${HOST_PORT_ES_TRANSPORT}"
     else
         log_warning "Environment is not running for project: $project_name"
         log_info "Use '$0 start' to start the environment"

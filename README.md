@@ -218,7 +218,20 @@ claudecode-docker-2/
 - **共通イメージ**: すべてのプロジェクトで`claude-code:latest`を使用
 - **コンテナ識別**: ディレクトリパスのハッシュで自動的にユニークなコンテナ名を生成
 - **プロジェクト分離**: 各ディレクトリの`projects/`フォルダは独立してマウント
-- **同時起動対応**: 複数のclaudecode-dockerディレクトリを同時に使用可能
+- **同時起動対応**: 複数のclaudecode-dockerディレクトリを同時に使用可能（ネットワーク名もComposeプロジェクト単位で分離）
+
+### 多重起動時のポート割り当て（自動化）
+- ディレクトリパスのハッシュから `PORT_OFFSET` を決定し、以下の公開ポートを自動でユニーク化します。
+  - `HOST_PORT_FE = 3001 + PORT_OFFSET`
+  - `HOST_PORT_BE = 4001 + PORT_OFFSET`
+  - `HOST_PORT_MCP = 5001 + PORT_OFFSET`
+  - `HOST_PORT_PG = 5433 + PORT_OFFSET`
+  - `HOST_PORT_REDIS = 6380 + PORT_OFFSET`
+  - `HOST_PORT_ES_HTTP = 9201 + PORT_OFFSET`
+  - `HOST_PORT_ES_TRANSPORT = 9301 + PORT_OFFSET`
+- `./dev.sh start` 実行時に計算され、`./docker-compose.yml` のポートに反映されます。
+- 実際の割り当ては `./dev.sh status` で確認できます。
+- 任意で固定したい場合は `.env` またはシェル環境で上記 `HOST_PORT_*` 変数や `PORT_OFFSET` を事前に指定してください。
 
 ## ディレクトリ構造
 
