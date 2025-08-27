@@ -169,6 +169,25 @@ docker-compose down
 
 ## 更新履歴
 
+### [2025-08-27] - Fix: 多重起動の自動ポート調整が効かない問題を修正
+- 実装内容:
+  - `dev.sh` の `get_compose_cmd()` を環境変数を副作用で設定する関数に変更（`COMPOSE_CMD` を設定）。
+  - `HOST_PORT_*` をコマンド置換の子プロセスで export してしまい親シェルに反映されない不具合を解消。
+  - 起動前の事前チェックで `PORT_OFFSET` を自動調整（`ss`/`lsof`/`netstat`/`nc`/`/dev/tcp` のいずれかで占有確認）。
+  - `start_env()` に起動失敗時の自動リトライを追加（"port is already allocated" を検出 → `down` → `PORT_OFFSET`++ → 未固定の `HOST_PORT_*` を再計算 → `up`、最大20回）。
+  - ログ出力に自動調整の採用オフセットを表示（例: `Auto-adjusted PORT_OFFSET from 446 to 447 …`）。
+- 理由: Redis 6380 等でポート競合が発生した際、意図した自動調整が効かず起動に失敗していたため。
+- 影響範囲: `dev.sh`（ポート割当の安定化、マルチインスタンス運用の堅牢化）。既存の `.env` で固定した `HOST_PORT_*` は尊重（自動調整対象外）。
+- テスト: 競合ポート常駐環境で `./dev.sh start`/`./dev.sh codex` を実行し、公開ポートが自動でユニーク化され起動できることを確認。
+
+### [2025-08-27] - Fix: Codex CLI 設定の tools スキーマ不一致を解消
+- 実装内容:
+  - `codex-config/config.toml` の `[[tools]]` 配列を削除し、トップレベルの `tools` キーも削除（バージョンによって boolean か struct を期待する差異があるため未設定とした）。
+  - `[mcp_servers.playwright]` の設定は維持（`npx @playwright/mcp@latest`）。
+- 理由: Codex CLI が `tools` に対して異なる型を要求するバージョンが存在し、「invalid type」エラーで起動不能になるため。
+- 影響範囲: Codex CLI 起動時の設定解釈。MCP 連携は維持。
+- テスト: `./dev.sh codex` 実行で Codex CLI が設定エラーなく起動することを確認。
+
 ### [2025-08-22] - 多重起動対応: ポートとネットワークの衝突回避
 - 実装内容:
   - `docker-compose.yml` の公開ポートを環境変数化（`HOST_PORT_*`）。

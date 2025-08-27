@@ -40,6 +40,36 @@ log_header() {
     echo -e "${CYAN}$1${NC}"
 }
 
+# Check if a TCP port is already in use on the host
+port_in_use() {
+    local port="$1"
+    # Prefer ss if available
+    if command -v ss >/dev/null 2>&1; then
+        ss -ltn | awk '{print $4}' | grep -Eq "(^|[:.])${port}$"
+        return $?
+    fi
+    # Fallback to lsof
+    if command -v lsof >/dev/null 2>&1; then
+        lsof -iTCP -sTCP:LISTEN -n -P 2>/dev/null | awk '{print $9}' | grep -Eq "[:.]${port}($|[^0-9])"
+        return $?
+    fi
+    # Fallback to netstat
+    if command -v netstat >/dev/null 2>&1; then
+        netstat -tuln 2>/dev/null | awk '{print $4}' | grep -Eq "(^|[:.])${port}$"
+        return $?
+    fi
+    # Fallback to nc (treat successful connect as 'in use')
+    if command -v nc >/dev/null 2>&1; then
+        nc -z 127.0.0.1 "$port" >/dev/null 2>&1
+        return $?
+    fi
+    # Fallback to bash /dev/tcp (works on many shells)
+    if (exec 3<>/dev/tcp/127.0.0.1/1) 2>/dev/null; then :; fi # ensure /dev/tcp supported silently
+    (echo > "/dev/tcp/127.0.0.1/${port}") >/dev/null 2>&1 && return 0
+    # If we cannot detect, assume not in use
+    return 1
+}
+
 # Get project name from .project-name file or directory name
 get_project_name() {
     local project_name=""
@@ -81,27 +111,79 @@ get_compose_cmd() {
     
     # Derive deterministic per-instance port offset from directory hash (0-999)
     # Allow manual override via environment: set HOST_PORT_* or PORT_OFFSET before running this script
-    if [ -z "${PORT_OFFSET:-}" ]; then
-        # Convert 8-hex hash to decimal and mod 1000
+    local initial_offset="${PORT_OFFSET:-}"
+    if [ -z "$initial_offset" ]; then
         local dec=$((16#${dir_hash}))
-        export PORT_OFFSET=$(( dec % 1000 ))
+        initial_offset=$(( dec % 1000 ))
     fi
-    
-    # Only set dynamic ports if not already provided by user or .env file
-    if [ -z "${HOST_PORT_FE:-}" ] && ! grep -q '^HOST_PORT_FE=' .env 2>/dev/null; then export HOST_PORT_FE=$((3001 + PORT_OFFSET)); fi
-    if [ -z "${HOST_PORT_BE:-}" ] && ! grep -q '^HOST_PORT_BE=' .env 2>/dev/null; then export HOST_PORT_BE=$((4001 + PORT_OFFSET)); fi
-    if [ -z "${HOST_PORT_MCP:-}" ] && ! grep -q '^HOST_PORT_MCP=' .env 2>/dev/null; then export HOST_PORT_MCP=$((5001 + PORT_OFFSET)); fi
-    if [ -z "${HOST_PORT_PG:-}" ] && ! grep -q '^HOST_PORT_PG=' .env 2>/dev/null; then export HOST_PORT_PG=$((5433 + PORT_OFFSET)); fi
-    if [ -z "${HOST_PORT_REDIS:-}" ] && ! grep -q '^HOST_PORT_REDIS=' .env 2>/dev/null; then export HOST_PORT_REDIS=$((6380 + PORT_OFFSET)); fi
-    if [ -z "${HOST_PORT_ES_HTTP:-}" ] && ! grep -q '^HOST_PORT_ES_HTTP=' .env 2>/dev/null; then export HOST_PORT_ES_HTTP=$((9201 + PORT_OFFSET)); fi
-    if [ -z "${HOST_PORT_ES_TRANSPORT:-}" ] && ! grep -q '^HOST_PORT_ES_TRANSPORT=' .env 2>/dev/null; then export HOST_PORT_ES_TRANSPORT=$((9301 + PORT_OFFSET)); fi
+
+    # Auto-adjust offset to avoid port collisions for ports we manage dynamically
+    # We do NOT override ports explicitly set via env or .env
+    local try_offset="$initial_offset"
+    local attempts=0
+    local max_attempts=100
+    while :; do
+        # Determine which ports we will manage dynamically (not set and not pinned in .env)
+        local dyn_fe=false dyn_be=false dyn_mcp=false dyn_pg=false dyn_redis=false dyn_es_http=false dyn_es_transport=false
+        [ -z "${HOST_PORT_FE:-}" ] && ! grep -q '^HOST_PORT_FE=' .env 2>/dev/null && dyn_fe=true
+        [ -z "${HOST_PORT_BE:-}" ] && ! grep -q '^HOST_PORT_BE=' .env 2>/dev/null && dyn_be=true
+        [ -z "${HOST_PORT_MCP:-}" ] && ! grep -q '^HOST_PORT_MCP=' .env 2>/dev/null && dyn_mcp=true
+        [ -z "${HOST_PORT_PG:-}" ] && ! grep -q '^HOST_PORT_PG=' .env 2>/dev/null && dyn_pg=true
+        [ -z "${HOST_PORT_REDIS:-}" ] && ! grep -q '^HOST_PORT_REDIS=' .env 2>/dev/null && dyn_redis=true
+        [ -z "${HOST_PORT_ES_HTTP:-}" ] && ! grep -q '^HOST_PORT_ES_HTTP=' .env 2>/dev/null && dyn_es_http=true
+        [ -z "${HOST_PORT_ES_TRANSPORT:-}" ] && ! grep -q '^HOST_PORT_ES_TRANSPORT=' .env 2>/dev/null && dyn_es_transport=true
+
+        # Compute candidate ports
+        local cand_fe=$((3001 + try_offset))
+        local cand_be=$((4001 + try_offset))
+        local cand_mcp=$((5001 + try_offset))
+        local cand_pg=$((5433 + try_offset))
+        local cand_redis=$((6380 + try_offset))
+        local cand_es_http=$((9201 + try_offset))
+        local cand_es_transport=$((9301 + try_offset))
+
+        # Check collisions only for dynamic ones
+        local conflict=false
+        $dyn_fe && port_in_use "$cand_fe" && conflict=true
+        $dyn_be && port_in_use "$cand_be" && conflict=true
+        $dyn_mcp && port_in_use "$cand_mcp" && conflict=true
+        $dyn_pg && port_in_use "$cand_pg" && conflict=true
+        $dyn_redis && port_in_use "$cand_redis" && conflict=true
+        $dyn_es_http && port_in_use "$cand_es_http" && conflict=true
+        $dyn_es_transport && port_in_use "$cand_es_transport" && conflict=true
+
+        if ! $conflict; then
+            # Export chosen offset and ports
+            export PORT_OFFSET="$try_offset"
+            $dyn_fe && export HOST_PORT_FE="$cand_fe"
+            $dyn_be && export HOST_PORT_BE="$cand_be"
+            $dyn_mcp && export HOST_PORT_MCP="$cand_mcp"
+            $dyn_pg && export HOST_PORT_PG="$cand_pg"
+            $dyn_redis && export HOST_PORT_REDIS="$cand_redis"
+            $dyn_es_http && export HOST_PORT_ES_HTTP="$cand_es_http"
+            $dyn_es_transport && export HOST_PORT_ES_TRANSPORT="$cand_es_transport"
+            # Helpful hint when offset had to move
+            if [ "$try_offset" != "$initial_offset" ]; then
+                log_info "Auto-adjusted PORT_OFFSET from $initial_offset to $try_offset to avoid port conflicts"
+            fi
+            break
+        fi
+
+        attempts=$((attempts + 1))
+        if [ $attempts -ge $max_attempts ]; then
+            log_warning "Could not find a free port set after $max_attempts attempts; proceeding with potential conflicts"
+            export PORT_OFFSET="$initial_offset"
+            break
+        fi
+        try_offset=$(( (try_offset + 1) % 1000 ))
+    done
     
     # DOCKER_GID is already set at script start
     
     if command -v docker-compose >/dev/null 2>&1; then
-        echo "docker-compose -p $project_name"
+        COMPOSE_CMD="docker-compose -p $project_name"
     elif docker compose version >/dev/null 2>&1; then
-        echo "docker compose -p $project_name"
+        COMPOSE_CMD="docker compose -p $project_name"
     else
         log_error "Docker Compose not found. Please run ./setup.sh first"
         exit 1
@@ -196,7 +278,8 @@ setup_env() {
 
 # Automatically rebuild image if Dockerfile changed
 rebuild_if_dockerfile_changed() {
-    local compose_cmd=$(get_compose_cmd)
+    get_compose_cmd
+    local compose_cmd="$COMPOSE_CMD"
     local checksum_file=".dockerfile.sha256"
 
     # Dockerfile が無い場合は何もしない
@@ -225,7 +308,8 @@ rebuild_if_dockerfile_changed() {
 
 # Start environment
 start_env() {
-    local compose_cmd=$(get_compose_cmd)
+    get_compose_cmd
+    local compose_cmd="$COMPOSE_CMD"
     
     # Show Docker GID info
     log_info "Using Docker GID: $DOCKER_GID"
@@ -262,7 +346,45 @@ start_env() {
     # Create override file based on credentials
     create_compose_override
     
-    $compose_cmd up -d
+    # Attempt to start; if port conflicts occur, auto-bump PORT_OFFSET and retry
+    local tries=0
+    local max_tries=20
+    while :; do
+        tries=$((tries + 1))
+        set +e
+        local up_output
+        up_output=$($compose_cmd up -d 2>&1)
+        local up_status=$?
+        set -e
+        if [ $up_status -eq 0 ]; then
+            break
+        fi
+        echo "$up_output" | grep -qiE 'port is already allocated|Bind for 0.0.0.0' || {
+            # Other failure; show logs and abort
+            echo "$up_output" >&2
+            exit $up_status
+        }
+        if [ $tries -ge $max_tries ]; then
+            log_error "Failed to auto-resolve port conflicts after ${max_tries} attempts"
+            echo "$up_output" >&2
+            exit 1
+        fi
+        log_warning "Port conflict detected. Attempting auto-adjust (try ${tries}/${max_tries})..."
+        # Bring down any partial containers before retrying
+        set +e; $compose_cmd down >/dev/null 2>&1; set -e
+        # Bump offset and clear dynamic HOST_PORT_* to force recompute
+        export PORT_OFFSET=$(( ( ${PORT_OFFSET:-0} + 1 ) % 1000 ))
+        for var in HOST_PORT_FE HOST_PORT_BE HOST_PORT_MCP HOST_PORT_PG HOST_PORT_REDIS HOST_PORT_ES_HTTP HOST_PORT_ES_TRANSPORT; do
+            # Only unset if not pinned in .env and not set by user explicitly in the current environment
+            if ! grep -q "^${var}=" .env 2>/dev/null; then
+                unset "$var"
+            fi
+        done
+        # Recompute compose command with new offset and ports
+        get_compose_cmd
+        compose_cmd="$COMPOSE_CMD"
+        log_info "Retrying with PORT_OFFSET=${PORT_OFFSET}"
+    done
     
     log_info "Published ports (host -> container):"
     echo "  FE:    ${HOST_PORT_FE} -> 3000"
@@ -290,7 +412,8 @@ start_env() {
 
 # Stop environment
 stop_env() {
-    local compose_cmd=$(get_compose_cmd)
+    get_compose_cmd
+    local compose_cmd="$COMPOSE_CMD"
     
     log_info "Stopping Claude Code development environment..."
     $compose_cmd down
@@ -306,7 +429,8 @@ restart_env() {
 
 # Enter shell
 enter_shell() {
-    local compose_cmd=$(get_compose_cmd)
+    get_compose_cmd
+    local compose_cmd="$COMPOSE_CMD"
     local project_name=$(get_project_name)
     
     # Check if container is running
@@ -325,7 +449,8 @@ enter_shell() {
 
 # Start Claude Code directly
 start_claude() {
-    local compose_cmd=$(get_compose_cmd)
+    get_compose_cmd
+    local compose_cmd="$COMPOSE_CMD"
     local project_name=$(get_project_name)
     
     # Check if container is running
@@ -341,7 +466,8 @@ start_claude() {
 
 # Start Gemini CLI directly
 start_gemini() {
-    local compose_cmd=$(get_compose_cmd)
+    get_compose_cmd
+    local compose_cmd="$COMPOSE_CMD"
     local project_name=$(get_project_name)
     
     # Check if container is running
@@ -377,7 +503,8 @@ start_gemini() {
 
 # Start Codex CLI directly
 start_codex() {
-    local compose_cmd=$(get_compose_cmd)
+    get_compose_cmd
+    local compose_cmd="$COMPOSE_CMD"
     local project_name=$(get_project_name)
 
     # Ensure container is running
@@ -448,7 +575,8 @@ start_codex() {
 
 # Playwright MCP helper (install/run inside container)
 mcp_playwright() {
-    local compose_cmd=$(get_compose_cmd)
+    get_compose_cmd
+    local compose_cmd="$COMPOSE_CMD"
     local project_name=$(get_project_name)
     local subcmd=${2:-run}
 
@@ -487,7 +615,8 @@ mcp_playwright() {
 
 # Show logs
 show_logs() {
-    local compose_cmd=$(get_compose_cmd)
+    get_compose_cmd
+    local compose_cmd="$COMPOSE_CMD"
     
     log_info "Showing container logs (Ctrl+C to exit)..."
     $compose_cmd logs -f claude-dev
@@ -495,7 +624,8 @@ show_logs() {
 
 # Show status
 show_status() {
-    local compose_cmd=$(get_compose_cmd)
+    get_compose_cmd
+    local compose_cmd="$COMPOSE_CMD"
     local project_name=$(get_project_name)
     
     log_info "Container status for project: $project_name"
