@@ -1,5 +1,17 @@
 # Claude Code Docker Environment - 開発状況
 
+## 更新履歴
+
+- 2025-08-28
+  - Fix: コンテナ shell が Ctrl-C でしか入れない問題を解消（`docker compose exec` に `-it` を付与）。
+  - Fix: `dev.sh shell` が zsh 不在で失敗しないよう bash フォールバックを追加。
+  - Fix: `dev.sh build` / `clean` で `get_compose_cmd` を正しく呼び出すよう修正（`build: command not found` を解消）。
+  - Fix: Codex CLI の設定パースエラー（`invalid type: map, expected a boolean in tools`）に対応。
+    - `codex-config/config.toml` から未対応の `[[tools]]` ブロックを削除。
+    - `dev.sh start` のホスト同期後に `config.toml` から `[[tools]]` を自動除去するサニタイズ処理を追加（再発防止）。
+  - Feat: Docker イメージに `zsh` を追加（Oh My Zsh 設定が活きるように）。
+  - Note: 変更反映には `./dev.sh build` → `./dev.sh restart` を推奨。
+
 ## プロジェクト概要
 Docker上でClaude Codeを使用するための開発環境テンプレート。コンテナ内でClaude Codeを実行し、プロジェクトファイルはホストとマウント共有する構成。
 

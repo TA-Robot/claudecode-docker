@@ -214,6 +214,11 @@ copy_credentials() {
         log_info "Syncing host ~/.codex -> ./codex-config ..."
         mkdir -p ./codex-config
         rsync -a --delete "$HOME/.codex/" ./codex-config/
+        # Sanitize Codex config to avoid schema conflicts (remove unsupported [[tools]] blocks)
+        if [[ -f ./codex-config/config.toml ]]; then
+            tmp_file=$(mktemp)
+            awk 'BEGIN{skip=0} /^\[\[tools\]\]/{skip=1; next} /^\[.*\]/{skip=0} skip==1{next} {print}' ./codex-config/config.toml > "$tmp_file" && mv "$tmp_file" ./codex-config/config.toml
+        fi
         chmod -R go-rwx ./codex-config 2>/dev/null || true
         log_success "Codex credentials synced"
     else
@@ -444,7 +449,8 @@ enter_shell() {
     log_info "You are now in /workspace/projects"
     log_info "Run 'claude' to start Claude Code"
     echo
-    $compose_cmd exec -u 1000 claude-dev zsh
+    # Prefer zsh if available; fall back to bash to avoid failures when zsh is missing
+    $compose_cmd exec -it -u 1000 claude-dev bash -lc 'if command -v zsh >/dev/null 2>&1; then exec zsh; else exec bash; fi'
 }
 
 # Start Claude Code directly
@@ -461,7 +467,7 @@ start_claude() {
     fi
     
     log_info "Starting Claude Code for project: $project_name"
-    $compose_cmd exec -u 1000 claude-dev claude --dangerously-skip-permissions
+    $compose_cmd exec -it -u 1000 claude-dev claude --dangerously-skip-permissions
 }
 
 # Start Gemini CLI directly
@@ -565,12 +571,13 @@ start_codex() {
         echo "  C) From source:      see AGENTS.md to install from repository"
         echo ""
         log_info "Opening container shell so you can install Codex CLI..."
-        $compose_cmd exec -u 1000 claude-dev zsh
+        # Open an interactive shell; prefer zsh if present, else bash
+        $compose_cmd exec -it -u 1000 claude-dev bash -lc 'if command -v zsh >/dev/null 2>&1; then exec zsh; else exec bash; fi'
         return
     fi
 
     log_info "Starting Codex CLI ($codex_bin) for project: $project_name"
-    $compose_cmd exec -u 1000 claude-dev bash -lc "$codex_bin --version || true; exec $codex_bin"
+    $compose_cmd exec -it -u 1000 claude-dev bash -lc "$codex_bin --version || true; exec $codex_bin"
 }
 
 # Playwright MCP helper (install/run inside container)
@@ -649,7 +656,8 @@ show_status() {
 
 # Build container
 build_env() {
-    local compose_cmd=$(get_compose_cmd)
+    get_compose_cmd
+    local compose_cmd="$COMPOSE_CMD"
     local project_name=$(get_project_name)
     
     log_info "Building shared container image..."
@@ -667,7 +675,8 @@ build_env() {
 
 # Clean up
 clean_env() {
-    local compose_cmd=$(get_compose_cmd)
+    get_compose_cmd
+    local compose_cmd="$COMPOSE_CMD"
     
     log_warning "This will remove containers and images"
     read -p "Are you sure? (y/N): " -n 1 -r

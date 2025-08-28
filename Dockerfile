@@ -99,7 +99,8 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
       unzip \
       vim \
       wget \
-      zip; \
+      zip \
+      zsh; \
     # locale
     sed -i '/ja_JP.UTF-8/s/^# //g' /etc/locale.gen; \
     locale-gen; \
