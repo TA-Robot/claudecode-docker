@@ -252,6 +252,7 @@ show_help() {
     echo "  claude    - Start Claude Code in the container"
     echo "  gemini    - Start Gemini CLI in the container"
     echo "  codex     - Start Codex CLI in the container"
+    echo "  codex-version - Print Codex CLI version (robust)"
     echo "  mcp-playwright [install|run] - Install/Run Playwright MCP"
     echo "  logs      - Show container logs"
     echo "  status    - Show container status"
@@ -445,6 +446,49 @@ enter_shell() {
         sleep 2
     fi
     
+    # Ensure Codex wrapper forwards args correctly and no alias masks it
+    log_info "Sanity-checking Codex CLI dispatch before opening shell..."
+    $compose_cmd exec -T -u 0 claude-dev bash -lc '
+      # Use -e only to avoid nounset errors during wrapper generation
+      set -e
+      WRAP=/usr/local/bin/codex
+      cat > "$WRAP" <<\EOS
+#!/usr/bin/env bash
+set -e
+SELF="$(readlink -f "$0" 2>/dev/null || realpath "$0" 2>/dev/null || echo "$0")"
+    # Prefer actual binary if present in users npm-global bin
+UG_BIN="/home/developer/.npm-global/bin/codex"
+if [ -x "$UG_BIN" ] && [ "$UG_BIN" != "$SELF" ]; then
+  exec "$UG_BIN" "$@"
+fi
+
+# Fallback to known JS entrypoints
+C1="/home/developer/.npm-global/lib/node_modules/@openai/codex/bin/codex.js"
+C2="/usr/local/lib/node_modules/@openai/codex/bin/codex.js"
+if [ -f "$C1" ]; then exec node "$C1" "$@"; fi
+if [ -f "$C2" ]; then exec node "$C2" "$@"; fi
+
+# Fallback to npm root detection
+NPM_ROOT="$(npm root -g 2>/dev/null || true)"
+if [ -n "$NPM_ROOT" ] && [ -f "$NPM_ROOT/@openai/codex/bin/codex.js" ]; then
+  exec node "$NPM_ROOT/@openai/codex/bin/codex.js" "$@"
+fi
+
+# Last resort: npx (may require network)
+if command -v npx >/dev/null 2>&1; then
+  exec npx -y @openai/codex "$@"
+fi
+echo "codex: entrypoint not found; ensure @openai/codex is installed" >&2
+exit 127
+EOS
+      chmod +x "$WRAP"; chown 1000:1000 "$WRAP"
+      # Remove any accidental alias/function named codex for the developer user
+      [ -f /home/developer/.zshrc ] || touch /home/developer/.zshrc
+      grep -q "unalias codex" /home/developer/.zshrc || echo "unalias codex 2>/dev/null || true" >> /home/developer/.zshrc
+      grep -q "unset -f codex" /home/developer/.zshrc || echo "unset -f codex 2>/dev/null || true" >> /home/developer/.zshrc
+      chown 1000:1000 /home/developer/.zshrc
+    '
+
     log_info "Entering container shell for project: $project_name"
     log_info "You are now in /workspace/projects"
     log_info "Run 'claude' to start Claude Code"
@@ -536,7 +580,8 @@ start_codex() {
           if [ -d "$PKG_DIR" ] && ! command -v codex >/dev/null 2>&1; then
             mkdir -p /usr/local/bin;
             echo "#!/usr/bin/env bash" > /usr/local/bin/codex;
-            echo "exec node $PKG_DIR/bin/codex.js \"$@\"" >> /usr/local/bin/codex;
+            # Correctly forward all CLI args to the Node entrypoint
+            echo "exec node \"$PKG_DIR/bin/codex.js\" \"\$@\"" >> /usr/local/bin/codex;
             chmod +x /usr/local/bin/codex;
             chown 1000:1000 /usr/local/bin/codex;
           fi'
@@ -577,7 +622,8 @@ start_codex() {
     fi
 
     log_info "Starting Codex CLI ($codex_bin) for project: $project_name"
-    $compose_cmd exec -it -u 1000 claude-dev bash -lc "$codex_bin --version || true; exec $codex_bin"
+    # Default: start with --search when supported; otherwise fall back to normal
+    $compose_cmd exec -it -u 1000 claude-dev bash -lc "$codex_bin --version || true; if $codex_bin --help 2>/dev/null | grep -q -- --search; then exec $codex_bin --search; else exec $codex_bin; fi"
 }
 
 # Playwright MCP helper (install/run inside container)
@@ -761,6 +807,34 @@ check_env() {
     fi
 }
 
+# Show Codex CLI version robustly inside container
+show_codex_version() {
+    get_compose_cmd
+    local compose_cmd="$COMPOSE_CMD"
+
+    # Ensure container is running
+    if ! $compose_cmd ps | grep -q "claude-dev.*Up"; then
+        log_warning "Container is not running. Starting environment..."
+        start_env
+        sleep 2
+    fi
+
+    log_info "Detecting Codex CLI version in container..."
+    # Try common patterns, bypass aliases/functions, and fall back to npm listing
+    $compose_cmd exec -T -u 1000 claude-dev bash -lc '
+        set -euo pipefail
+        # Prefer absolute binary if available
+        BIN=$(command -v codex || true)
+        if [ -n "$BIN" ]; then
+          # Bypass potential shell aliases/functions via `command`
+          (command "$BIN" --version 2>/dev/null) || true
+          (command "$BIN" version 2>/dev/null) || true
+        fi
+        # npm fallback (reliable)
+        npm ls -g @openai/codex --depth=0 2>/dev/null | sed -n "s/.*@openai\/codex@\(.*\)$/@openai\/codex@\1/p" || true
+    '
+}
+
 # Main function
 main() {
     case "${1:-help}" in
@@ -787,6 +861,9 @@ main() {
             ;;
         codex)
             start_codex
+            ;;
+        codex-version)
+            show_codex_version
             ;;
         mcp-playwright)
             mcp_playwright "$@"
