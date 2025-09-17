@@ -623,7 +623,7 @@ start_codex() {
 
     log_info "Starting Codex CLI ($codex_bin) for project: $project_name"
     # Default: start with --search when supported; otherwise fall back to normal
-    $compose_cmd exec -it -u 1000 claude-dev bash -lc "$codex_bin --version || true; if $codex_bin --help 2>/dev/null | grep -q -- --search; then exec $codex_bin --search; else exec $codex_bin; fi"
+    $compose_cmd exec -it -u 1000 claude-dev bash -lc "$codex_bin --version || true; if $codex_bin --help 2>/dev/null | grep -q -- --search; then exec $codex_bin --searcha --dangerously-bypass-approvals-and-sandbox; else exec $codex_bin --dangerously-bypass-approvals-and-sandbox; fi"
 }
 
 # Playwright MCP helper (install/run inside container)
