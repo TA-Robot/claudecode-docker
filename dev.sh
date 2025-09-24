@@ -13,6 +13,11 @@ RED='\033[0;31m'
 CYAN='\033[0;36m'
 NC='\033[0m'
 
+# Default location for additional container environment definitions
+DEFAULT_CONTAINER_ENV_FILE="${DEFAULT_CONTAINER_ENV_FILE:-$HOME/secret/.env.container}"
+EMPTY_CONTAINER_ENV_FILE="${EMPTY_CONTAINER_ENV_FILE:-container-env.empty}"
+CLAUDE_CONTAINER_ENV_READY=0
+
 # Auto-detect Docker GID at script start
 if [ -z "$DOCKER_GID" ]; then
     export DOCKER_GID=$(stat -c %g /var/run/docker.sock 2>/dev/null || echo "999")
@@ -38,6 +43,70 @@ log_error() {
 
 log_header() {
     echo -e "${CYAN}$1${NC}"
+}
+
+# Resolve a path to an absolute form with basic portability fallbacks
+canonicalize_path() {
+    local input="$1"
+    if [[ -z "$input" ]]; then
+        return 1
+    fi
+
+    case "$input" in
+        "~"|"~/"*)
+            input="$HOME${input:1}"
+            ;;
+    esac
+
+    if command -v realpath >/dev/null 2>&1; then
+        realpath "$input" 2>/dev/null && return 0
+    fi
+    if command -v python3 >/dev/null 2>&1; then
+        python3 -c 'import os, sys; print(os.path.abspath(os.path.expanduser(sys.argv[1])))' "$input" 2>/dev/null && return 0
+    fi
+    if command -v perl >/dev/null 2>&1; then
+        perl -MCwd -e 'print Cwd::abs_path($ARGV[0])' "$input" 2>/dev/null && return 0
+    fi
+
+    if [[ "$input" != /* ]]; then
+        input="$(pwd)/$input"
+    fi
+    echo "$input"
+}
+
+# Detect host-side container environment file and expose it for docker compose
+prepare_container_env_file() {
+    if [[ "$CLAUDE_CONTAINER_ENV_READY" == "1" ]]; then
+        return
+    fi
+    CLAUDE_CONTAINER_ENV_READY=1
+
+    local candidate="${CLAUDE_CONTAINER_ENV_FILE:-${CONTAINER_ENV_FILE:-}}"
+    local resolved
+
+    if [[ -n "$candidate" ]]; then
+        resolved=$(canonicalize_path "$candidate" 2>/dev/null || true)
+        if [[ -n "$resolved" && -f "$resolved" ]]; then
+            export CLAUDE_CONTAINER_ENV_FILE="$resolved"
+            log_info "Using container env file: $resolved"
+            return
+        fi
+        log_warning "Specified container env file '$candidate' not found; falling back"
+    fi
+
+    resolved=$(canonicalize_path "$DEFAULT_CONTAINER_ENV_FILE" 2>/dev/null || true)
+    if [[ -n "$resolved" && -f "$resolved" ]]; then
+        export CLAUDE_CONTAINER_ENV_FILE="$resolved"
+        log_info "Detected container env file at $resolved"
+    else
+        if [[ ! -f "$EMPTY_CONTAINER_ENV_FILE" ]]; then
+            mkdir -p "$(dirname "$EMPTY_CONTAINER_ENV_FILE")"
+            : > "$EMPTY_CONTAINER_ENV_FILE"
+        fi
+        resolved=$(canonicalize_path "$EMPTY_CONTAINER_ENV_FILE" 2>/dev/null || echo "$EMPTY_CONTAINER_ENV_FILE")
+        export CLAUDE_CONTAINER_ENV_FILE="$resolved"
+        log_info "No external container env file detected; using fallback $resolved"
+    fi
 }
 
 # Check if a TCP port is already in use on the host
@@ -104,6 +173,7 @@ generate_dynamic_compose() {
 
 # Check if Docker Compose is available
 get_compose_cmd() {
+    prepare_container_env_file
     # Set project name based on current directory path
     local dir_hash=$(pwd | sha256sum | cut -c1-8)
     local project_name="claude-${dir_hash}"
@@ -622,7 +692,7 @@ start_codex() {
     fi
 
     log_info "Starting Codex CLI ($codex_bin) for project: $project_name"
-    # Default: start with --search when supported; otherwise fall back to normal
+    # Default: start with - when supported; otherwise fall back to normal
     $compose_cmd exec -it -u 1000 claude-dev bash -lc "$codex_bin --version || true; if $codex_bin --help 2>/dev/null | grep -q -- --search; then exec $codex_bin --search --dangerously-bypass-approvals-and-sandbox; else exec $codex_bin --dangerously-bypass-approvals-and-sandbox; fi"
 }
 

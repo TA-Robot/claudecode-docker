@@ -100,6 +100,12 @@ cp .env.example .env
 ```
 `.env` ファイルを編集して、`ANTHROPIC_API_KEY`と`GEMINI_API_KEY`を設定してください。
 
+##### コンテナ向けシークレット環境変数
+- ホスト側で `~/secret/.env.container`（`.env` 形式）を用意すると、`./dev.sh start` や `./dev.sh codex` 実行時に自動で読み込まれ、`claude-dev` コンテナ内の環境変数として反映されます。
+- 形式は通常の `.env` と同じで `KEY=value` 行のみを記述してください（コメントや空行は無視されます）。
+- デフォルトの場所を変更したい場合は、コマンド実行前に `export CLAUDE_CONTAINER_ENV_FILE=/absolute/path/to/env` を指定します（`~` や相対パスでも可、スクリプトが絶対パスへ解決します）。
+- ファイルを更新した場合はコンテナを再起動してください（`./dev.sh restart`）。
+
 #### 3. コンテナのビルドと起動
 ```bash
 # 初回ビルド（共通イメージを作成）

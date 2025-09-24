@@ -32,6 +32,8 @@ services:
       - ./logs:/workspace/logs
       - ./coverage:/workspace/coverage
       - ./test-results:/workspace/test-results
+    env_file:
+      - ${CLAUDE_CONTAINER_ENV_FILE:-./container-env.empty}
     environment:
       # API keys (optional). Prefer host-side credentials that are mounted/copied.
       - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}

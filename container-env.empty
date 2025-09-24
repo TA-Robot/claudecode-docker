@@ -1,0 +1,2 @@
+# Placeholder env file for claude-dev container; keep this file in git so docker compose works.
+# Add secrets in ~/secret/.env.container or set CLAUDE_CONTAINER_ENV_FILE before running dev.sh.
